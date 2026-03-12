@@ -3,19 +3,19 @@
    ============================================ */
 :root {
   /* ── Colores primarios ─────────────────── */
-  --blue-900: #1e3a5f;
-  --blue-800: #1e40af;
-  --blue-700: #1d4ed8;
-  --blue-600: #2563eb;
-  --blue-500: #3b82f6;
-  --blue-400: #60a5fa;
-  --blue-300: #93c5fd;
-  --blue-200: #bfdbfe;
-  --blue-100: #dbeafe;
-  --blue-50:  #eff6ff;
+  --blue-900: #064e3b;
+  --blue-800: #065f46;
+  --blue-700: #047857;
+  --blue-600: #059669;
+  --blue-500: #10b981;
+  --blue-400: #34d399;
+  --blue-300: #6ee7b7;
+  --blue-200: #a7f3d0;
+  --blue-100: #d1fae5;
+  --blue-50:  #ecfdf5;
 
-  --accent:        #0ea5e9;
-  --accent-dark:   #0284c7;
+  --accent:        #14b8a6;
+  --accent-dark:   #0d9488;
 
   /* ── Semánticos ────────────────────────── */
   --color-primary:       var(--blue-600);
@@ -91,8 +91,8 @@
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.05);
   --shadow-lg: 0 10px 15px rgba(0,0,0,0.07), 0 4px 6px rgba(0,0,0,0.04);
   --shadow-xl: 0 20px 25px rgba(0,0,0,0.08), 0 10px 10px rgba(0,0,0,0.04);
-  --shadow-blue: 0 4px 16px rgba(37,99,235,0.28);
-  --shadow-blue-lg: 0 8px 32px rgba(37,99,235,0.35);
+  --shadow-blue: 0 4px 16px rgba(5,150,105,0.28);
+  --shadow-blue-lg: 0 8px 32px rgba(5,150,105,0.35);
 
   /* ── Transiciones ──────────────────────── */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
