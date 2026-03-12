@@ -82,6 +82,7 @@ const VoyDB = (() => {
       phone:        f.Phone         || '',
       email:        f.Email         || '',
       passwordHash: f.PasswordHash  || '',
+      status:       f.Status        || 'active',
     };
   }
 
@@ -221,7 +222,7 @@ const VoyDB = (() => {
           Phone:        data.phone        || '',
           City:         data.city         || 'Viña del Mar',
           TotalServices:0,
-          MemberSince:  new Date().toLocaleDateString('es-CL'),
+          MemberSince:  new Date().toISOString().split('T')[0],
           Avatar:       `https://i.pravatar.cc/80?u=${data.email}`,
         },
       }),

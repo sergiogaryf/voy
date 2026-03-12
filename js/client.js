@@ -708,8 +708,14 @@ async function submitRating() {
 function loadClientProfile() {
   const el = document.getElementById('clientProfile');
   if (!el) return;
-  const client = clientData || VOY_DATA.clients[0];
-  if (!client) return;
+  const client = clientData;
+  if (!client) {
+    el.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--gray-400);">
+      <i class="fa-solid fa-circle-exclamation" style="font-size:2rem;margin-bottom:var(--sp-3);"></i>
+      <p>No se pudo cargar tu perfil. <a href="#" onclick="location.reload()">Reintentar</a></p>
+    </div>`;
+    return;
+  }
 
   const favCount       = favorites.size;
   const completedCount = VOY_DATA.bookings.filter(b => b.status === 'completed').length;
