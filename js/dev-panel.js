@@ -509,10 +509,28 @@ const VOY_DEV = (() => {
     addMergeLog('Iniciando fusión manual...');
     addMergeLog(`Fuente: <span style="color:#0EA5E9;">Sergio/main</span> + <span style="color:#10B981;">Guillermo/dev-panel</span>`);
 
-    // Simular merge (en producción real esto usaría GitHub API con token)
-    await new Promise(r => setTimeout(r, 1500));
-    addMergeLog('<span style="color:#10B981;">Fusión completada</span> — deploy a voy-app-3 en curso');
-    addMergeLog('Resultado disponible en <span style="color:#8B5CF6;">voy-app-3.vercel.app</span>');
+    try {
+      // Llamar API serverless en voy-app-3 para merge real
+      const apiBase = `https://${DEPLOYS.fusion.url}`;
+      const res = await fetch(`${apiBase}/api/merge`, { method: 'POST' });
+      const data = await res.json();
+
+      if (data.log) data.log.forEach(l => addMergeLog(l));
+
+      if (data.success) {
+        if (data.merged > 0) {
+          addMergeLog(`<span style="color:#10B981;">Fusión completada</span> — ${data.merged}/${data.total} PR(s) mergeados`);
+          addMergeLog('Redeploy en curso en <span style="color:#8B5CF6;">voy-app-3.vercel.app</span>');
+        } else {
+          addMergeLog('<span style="color:#F59E0B;">No hay PRs abiertos para fusionar</span>');
+        }
+      } else {
+        addMergeLog(`<span style="color:#EF4444;">Error: ${data.error || 'desconocido'}</span>`);
+      }
+    } catch (e) {
+      addMergeLog(`<span style="color:#EF4444;">Error de conexión: ${e.message}</span>`);
+      addMergeLog('Verifica que voy-app-3 tenga la variable VOY_GITHUB_TOKEN configurada');
+    }
 
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-code-merge"></i> Fusionar ahora a voy-app-3'; }
   }
