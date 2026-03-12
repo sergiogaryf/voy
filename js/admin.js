@@ -168,11 +168,17 @@ function loadVerificationsList() {
             </span>
           </div>
           <div style="display:flex;gap:var(--sp-2);flex-wrap:wrap;">
-            ${v.docs.map(d => `
-            <div style="display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--gray-50);border-radius:var(--radius-lg);font-size:var(--text-xs);cursor:pointer;" onclick="VOY.showToast('Vista de documentos próximamente','info')">
-              <i class="fa-solid fa-file-image" style="color:var(--color-primary);"></i> ${d}
-              <i class="fa-solid fa-eye" style="color:var(--gray-400);"></i>
-            </div>`).join('')}
+            ${v.documents && v.documents.length
+  ? v.documents.map(doc => `
+    <a href="${doc.url}" target="_blank" title="Ver ${doc.filename || 'documento'}"
+       style="display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--gray-50);border-radius:var(--radius-lg);font-size:var(--text-xs);cursor:pointer;text-decoration:none;color:inherit;border:1px solid var(--gray-200);">
+      <i class="fa-solid fa-file-image" style="color:var(--color-primary);"></i>
+      ${doc.filename || 'documento'}
+      <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--gray-400);margin-left:auto;"></i>
+    </a>`).join('')
+  : v.docs.length
+    ? v.docs.map(d => `<span style="padding:var(--sp-1) var(--sp-2);background:var(--gray-100);border-radius:var(--radius-md);font-size:var(--text-xs);">${d}</span>`).join('')
+    : '<span style="font-size:var(--text-xs);color:var(--gray-400);">Sin documentos adjuntos</span>'}
           </div>
         </div>
         ${v.status === 'pending' ? `

@@ -425,6 +425,7 @@ async function confirmBooking() {
 
     // Crear también la solicitud en la tabla Requests para el worker
     await VoyDB.createRequest({
+      clientId:       clientData?.id || clientSession?.id || 101,
       clientName:     clientData?.name || clientSession?.name || 'Cliente',
       clientAvatar:   clientData?.avatar || clientSession?.avatar || '',
       clientRating:   5,
@@ -453,20 +454,39 @@ async function confirmBooking() {
 }
 
 /* ── Chat ───────────────────────────────── */
-let chatConversationId = 'conv-1-101';
+let chatConversationId = null;
+let chatPollInterval   = null;
 
 async function toggleChat() {
   const panel = document.getElementById('chatPanel');
   if (!panel) return;
-  const showing = panel.style.display !== 'none';
-  panel.style.display = showing ? 'none' : 'flex';
-  panel.style.flexDirection = 'column';
-  if (!showing) await renderChatMessages();
+  const showing = panel.classList.contains('open');
+  if (showing) {
+    panel.classList.remove('open');
+    stopChatPolling();
+  } else {
+    if (!chatConversationId && selectedWorker) openChat();
+    else {
+      panel.classList.add('open');
+      await renderChatMessages();
+      startChatPolling();
+    }
+  }
+}
+
+function startChatPolling() {
+  stopChatPolling();
+  chatPollInterval = setInterval(renderChatMessages, 5000);
+}
+
+function stopChatPolling() {
+  if (chatPollInterval) { clearInterval(chatPollInterval); chatPollInterval = null; }
 }
 
 async function renderChatMessages() {
   const el = document.getElementById('chatMessages');
   if (!el) return;
+  if (!chatConversationId) return;
   el.innerHTML = '<div style="text-align:center;padding:8px;color:var(--gray-300);font-size:12px;"><i class="fa-solid fa-spinner fa-spin"></i></div>';
   try {
     const msgs = await VoyDB.getMessages(chatConversationId);
@@ -504,11 +524,17 @@ function handleChatKey(e) {
 }
 
 function openChat() {
-  if (selectedWorker) {
-    chatConversationId = `conv-${selectedWorker.id}-101`;
+  if (!selectedWorker) return;
+  const myId = clientData?.id || clientSession?.id || 101;
+  chatConversationId = `chat_w${selectedWorker.id}_c${myId}`;
+  const panel = document.getElementById('chatPanel');
+  const title = document.getElementById('chatWorkerName');
+  if (title) title.textContent = selectedWorker.name;
+  if (panel) {
+    panel.classList.add('open');
+    renderChatMessages();
+    startChatPolling();
   }
-  closeWorkerDetail();
-  toggleChat();
 }
 
 /* ── Active services ────────────────────── */

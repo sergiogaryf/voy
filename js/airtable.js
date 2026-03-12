@@ -118,6 +118,7 @@ const VoyDB = (() => {
       time:          f.Time           || '',
       address:       f.Address        || '',
       estimatedPrice:f.EstimatedPrice || 0,
+      clientId:      f.ClientId       || 0,
       isNew:         f.IsNew          || false,
       status:        f.Status         || 'pending',
       distance:      f.Distance       || 0,
@@ -128,14 +129,16 @@ const VoyDB = (() => {
   function mapVerification(rec) {
     const f = rec.fields;
     return {
-      _recordId:   rec.id,
-      id:          f.VerifId     || '',
-      name:        f.WorkerName  || '',
-      avatar:      f.Avatar      || '',
-      category:    f.Category    || '',
-      date:        f.RequestDate || '',
-      docs:        f.Docs ? f.Docs.split(',').map(s => s.trim()) : [],
-      status:      f.Status      || 'pending',
+      _recordId:        rec.id,
+      id:               f.VerifId      || '',
+      name:             f.WorkerName   || '',
+      avatar:           f.Avatar       || '',
+      category:         f.Category     || '',
+      date:             f.RequestDate  || '',
+      docs:             f.Docs ? f.Docs.split(',').map(s => s.trim()).filter(Boolean) : [],
+      documents:        f.Documents    || [],   // Array de objetos {url, filename, id}
+      status:           f.Status       || 'pending',
+      workerRecordId:   f.WorkerRecordId || '',
     };
   }
 
@@ -366,6 +369,7 @@ const VoyDB = (() => {
           Time:           data.time           || '',
           Address:        data.address        || '',
           EstimatedPrice: data.estimatedPrice || 0,
+          ClientId:       data.clientId       || 0,
           IsNew:          true,
           Status:         'pending',
           Distance:       data.distance       || 0,
@@ -495,6 +499,62 @@ const VoyDB = (() => {
     return favs;
   }
 
+  /* ── Verificación (upload docs) ─────────── */
+  async function getVerificationByWorker(workerRecordId) {
+    const formula = `{WorkerRecordId}="${workerRecordId}"`;
+    const records = await listAll('Verifications', `filterByFormula=${encodeURIComponent(formula)}`);
+    return records.length ? mapVerification(records[0]) : null;
+  }
+
+  async function createVerification(workerRecordId, workerData) {
+    const rec = await request('Verifications', {
+      method: 'POST',
+      body: JSON.stringify({
+        fields: {
+          VerifId:        'VER-' + String(Date.now()).slice(-4),
+          WorkerName:     workerData.name || '',
+          Avatar:         workerData.avatar || '',
+          Category:       workerData.categoryLabel || workerData.category || '',
+          RequestDate:    new Date().toLocaleDateString('es-CL'),
+          Status:         'pending',
+          WorkerRecordId: workerRecordId,
+          Docs:           '',
+        },
+      }),
+    });
+    return mapVerification(rec);
+  }
+
+  async function uploadVerificationDoc(verifRecordId, file) {
+    // Usa Airtable Content API para subir archivo directamente
+    const fieldId = 'fldvDVYNYBqRiDI4C'; // Documents field
+    const url = `https://content.airtable.com/v0/${baseId()}/${verifRecordId}/${fieldId}/uploadAttachment`;
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    formData.append('filename', file.name);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}` },
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Upload failed: ${err?.error?.message || res.statusText}`);
+    }
+    return res.json();
+  }
+
+  async function updateVerificationDocs(recordId, docLabel) {
+    // Actualiza el campo Docs (texto) con la lista de documentos subidos
+    const rec = await request(`Verifications/${recordId}`);
+    const existing = rec.fields.Docs ? rec.fields.Docs.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (!existing.includes(docLabel)) existing.push(docLabel);
+    return request(`Verifications/${recordId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: { Docs: existing.join(', ') } }),
+    });
+  }
+
   /* ── Exports públicos ────────────────────── */
   return {
     // Auth
@@ -511,6 +571,8 @@ const VoyDB = (() => {
     getRequests, createRequest, updateRequest, updateRequestStatus,
     // Verifications
     getVerifications, updateVerification,
+    getVerificationByWorker, createVerification,
+    uploadVerificationDoc, updateVerificationDocs,
     // Transactions
     getTransactions, createTransaction,
     // Messages

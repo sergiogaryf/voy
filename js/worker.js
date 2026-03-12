@@ -6,6 +6,11 @@ let workerData = null;
 let workerSession = null;
 let workerRequests = [];
 
+let workerChatConversationId = null;
+let workerChatPollInterval    = null;
+let workerChatClientId        = null;
+let workerChatClientName      = 'Cliente';
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Verificar sesión — redirige a /login/ si no hay sesión de profesional
   workerSession = VoyAuth.requireRole('profesional');
@@ -114,7 +119,7 @@ function loadActiveJobCard() {
       <div style="font-weight:700; color:var(--color-primary);">${VOY.formatCLP(active.price)}</div>
     </div>
     <div style="display:flex; gap:var(--sp-3);">
-      <button class="btn btn-outline flex-1" onclick="VOY.showToast('Chat próximamente', 'info')">
+      <button class="btn btn-outline flex-1" onclick="openWorkerChat(${active.clientId}, '${(client?.name || 'Cliente').replace(/'/g, "\\'")}')">
         <i class="fa-solid fa-comment-dots"></i> Chat
       </button>
       <button class="btn btn-success flex-1" onclick="completeJob('${active._recordId}')">
@@ -249,7 +254,7 @@ function buildRequestCard(r) {
       <button class="btn btn-ghost btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'declined')">
         <i class="fa-solid fa-xmark"></i> Rechazar
       </button>
-      <button class="btn btn-outline btn-sm flex-1" onclick="VOY.showToast('Chat próximamente', 'info')">
+      <button class="btn btn-outline btn-sm flex-1" onclick="openWorkerChat(${r.clientId || 0}, '${(r.clientName || 'Cliente').replace(/'/g, "\\'")}')">
         <i class="fa-solid fa-comment-dots"></i> Preguntar
       </button>
       <button class="btn btn-success btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'accepted')">
@@ -573,41 +578,78 @@ async function saveWorkerProfile() {
 }
 
 /* ── Verification ───────────────────────── */
-function loadVerification() {
+let workerVerifRecord = null;
+
+async function loadVerification() {
   const el = document.getElementById('verificationView');
-  if (!el) return;
-  const steps = [
-    { icon: '✓', cls: 'done',    title: 'Cuenta Google vinculada',   desc: 'Tu cuenta está verificada con Google Sign-In.', action: null },
-    { icon: '✓', cls: 'done',    title: 'Número de teléfono',         desc: `${workerData?.phone || '+56 9 XXXX XXXX'} · verificado por SMS.`, action: null },
-    { icon: '!', cls: 'pending', title: 'Cédula de identidad',        desc: 'Sube ambos lados de tu cédula para verificar tu identidad.', action: 'Subir documento' },
-    { icon: '!', cls: 'pending', title: 'Foto de perfil con cédula',  desc: 'Una selfie sosteniendo tu cédula de identidad.', action: 'Subir foto' },
-    { icon: '✗', cls: 'missing', title: 'Certificación profesional',  desc: 'Sube tus certificados o título que acredite tu oficio.', action: 'Subir certificado' },
+  if (!el || !workerData) return;
+
+  // Obtener o crear registro de verificación para este profesional
+  try {
+    workerVerifRecord = await VoyDB.getVerificationByWorker(workerData._recordId);
+    if (!workerVerifRecord) {
+      workerVerifRecord = await VoyDB.createVerification(workerData._recordId, workerData);
+    }
+  } catch(e) {
+    console.error('Error cargando verificación:', e);
+  }
+
+  const uploadedDocs = workerVerifRecord?.docs || [];
+  const docsCount    = uploadedDocs.length;
+  const totalSteps   = 3;
+  const pct          = Math.min(100, Math.round((docsCount / totalSteps) * 100));
+
+  const docTypes = [
+    { key: 'cedula',       icon: 'fa-id-card',     title: 'Cédula de identidad',       desc: 'Sube una foto de ambos lados de tu cédula.', accept: 'image/*' },
+    { key: 'selfie',       icon: 'fa-camera',       title: 'Foto con cédula',           desc: 'Una selfie sosteniendo tu cédula de identidad.', accept: 'image/*' },
+    { key: 'certificado',  icon: 'fa-file-lines',   title: 'Certificación profesional', desc: 'Sube tu título o certificado de oficio.', accept: 'image/*,.pdf' },
   ];
+
   el.innerHTML = `
     <div style="display:grid; grid-template-columns:1fr 360px; gap:var(--sp-6);">
       <div class="card">
         <div class="card-header">
           <strong>Estado de verificación</strong>
-          <div style="margin-top:var(--sp-2);">
+          <span class="badge ${workerVerifRecord?.status === 'approved' ? 'badge-green' : workerVerifRecord?.status === 'rejected' ? 'badge-red' : 'badge-yellow'}">
+            ${workerVerifRecord?.status === 'approved' ? '✓ Aprobado' : workerVerifRecord?.status === 'rejected' ? '✗ Rechazado' : '⏳ En revisión'}
+          </span>
+          <div style="margin-top:var(--sp-3);">
             <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);margin-bottom:var(--sp-2);">
-              <span style="color:var(--gray-500);">Progreso</span><span style="font-weight:600;color:var(--color-primary);">40%</span>
+              <span style="color:var(--gray-500);">Documentos subidos</span>
+              <span style="font-weight:600;color:var(--color-primary);">${docsCount}/${totalSteps} · ${pct}%</span>
             </div>
             <div style="height:8px;background:var(--gray-100);border-radius:var(--radius-full);">
-              <div style="height:8px;width:40%;background:linear-gradient(90deg,var(--color-primary),var(--accent));border-radius:var(--radius-full);"></div>
+              <div style="height:8px;width:${pct}%;background:linear-gradient(90deg,var(--color-primary),#6366f1);border-radius:var(--radius-full);transition:width 0.5s;"></div>
             </div>
           </div>
         </div>
         <div class="card-body">
-          ${steps.map(s => `
-          <div class="verification-step">
-            <div class="step-icon ${s.cls}">${s.icon}</div>
-            <div style="flex:1;">
-              <div style="font-weight:600;color:var(--gray-900);margin-bottom:2px;">${s.title}</div>
-              <div style="font-size:var(--text-sm);color:var(--gray-500);">${s.desc}</div>
-            </div>
-            ${s.action ? `<button class="btn btn-outline btn-sm" onclick="VOY.showToast('Subida de documentos próximamente','info')">${s.action}</button>` : '<span style="color:var(--color-success);font-size:var(--text-sm);">✓ Listo</span>'}
-          </div>`).join('')}
+          ${docTypes.map(d => {
+            const done = uploadedDocs.includes(d.key);
+            return `
+            <div class="verification-step">
+              <div class="step-icon ${done ? 'done' : 'pending'}">${done ? '✓' : '!'}</div>
+              <div style="flex:1;">
+                <div style="font-weight:600;color:var(--gray-900);margin-bottom:2px;">${d.title}</div>
+                <div style="font-size:var(--text-sm);color:var(--gray-500);">${d.desc}</div>
+              </div>
+              ${done
+                ? '<span style="color:var(--color-success);font-size:var(--text-sm);white-space:nowrap;">✓ Subido</span>'
+                : `<div>
+                    <input type="file" id="fileInput_${d.key}" accept="${d.accept}" style="display:none;" onchange="handleDocUpload(this, '${d.key}')" />
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileInput_${d.key}').click()" id="uploadBtn_${d.key}">
+                      <i class="fa-solid fa-upload"></i> Subir
+                    </button>
+                   </div>`}
+            </div>`;
+          }).join('')}
         </div>
+        ${workerVerifRecord?.status === 'rejected' ? `
+        <div style="padding:var(--sp-4);background:#fef2f2;border-radius:0 0 var(--radius-xl) var(--radius-xl);">
+          <p style="font-size:var(--text-sm);color:var(--color-danger);">
+            <i class="fa-solid fa-circle-xmark"></i> Tu verificación fue rechazada. Revisa los documentos y vuelve a subir.
+          </p>
+        </div>` : ''}
       </div>
       <div class="card" style="align-self:start;">
         <div class="card-body">
@@ -624,6 +666,28 @@ function loadVerification() {
         </div>
       </div>
     </div>`;
+}
+
+async function handleDocUpload(input, docKey) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { VOY.showToast('El archivo no debe superar 5MB', 'error'); return; }
+
+  const btn = document.getElementById(`uploadBtn_${docKey}`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Subiendo...'; }
+
+  try {
+    if (!workerVerifRecord) throw new Error('No hay registro de verificación');
+    await VoyDB.uploadVerificationDoc(workerVerifRecord._recordId, file);
+    await VoyDB.updateVerificationDocs(workerVerifRecord._recordId, docKey);
+    VOY.showToast('Documento subido exitosamente', 'success');
+    // Recargar la vista para mostrar estado actualizado
+    await loadVerification();
+  } catch (e) {
+    console.error('Error subiendo documento:', e);
+    VOY.showToast('Error al subir el documento. Intenta de nuevo.', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-upload"></i> Subir'; }
+  }
 }
 
 /* ── Reviews ────────────────────────────── */
@@ -732,6 +796,76 @@ function showView(name, el) {
   if (name === 'verificacion') loadVerification();
   if (name === 'agenda')       { loadCalendar(); loadAgendaDay(); }
   if (name === 'dashboard')    loadWorkerDashboard();
+}
+
+/* ── Chat del profesional ─────────────────────── */
+function openWorkerChat(clientId, clientName) {
+  workerChatClientId   = clientId;
+  workerChatClientName = clientName || 'Cliente';
+  workerChatConversationId = `chat_w${workerData?.id}_c${clientId}`;
+
+  const title = document.getElementById('workerChatTitle');
+  if (title) title.textContent = workerChatClientName;
+
+  VOY.openModal('workerChatModal');
+  renderWorkerChatMessages();
+  startWorkerChatPolling();
+}
+
+function closeWorkerChat() {
+  stopWorkerChatPolling();
+  VOY.closeModal('workerChatModal');
+}
+
+function startWorkerChatPolling() {
+  stopWorkerChatPolling();
+  workerChatPollInterval = setInterval(renderWorkerChatMessages, 5000);
+}
+
+function stopWorkerChatPolling() {
+  if (workerChatPollInterval) {
+    clearInterval(workerChatPollInterval);
+    workerChatPollInterval = null;
+  }
+}
+
+async function renderWorkerChatMessages() {
+  if (!workerChatConversationId) return;
+  const el = document.getElementById('workerChatMessages');
+  if (!el) return;
+  try {
+    const msgs = await VoyDB.getMessages(workerChatConversationId);
+    if (!msgs.length) {
+      el.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:var(--text-sm);padding:var(--sp-6);">Sin mensajes aún. ¡Saluda!</div>';
+      return;
+    }
+    el.innerHTML = msgs.map(m => `
+      <div class="chat-msg ${m.from === 'worker' ? 'sent' : 'received'}">
+        <div class="chat-msg-bubble">${m.text}</div>
+        <div class="chat-msg-time">${m.time}</div>
+      </div>`).join('');
+    el.scrollTop = el.scrollHeight;
+  } catch (e) {
+    console.error('Error cargando mensajes:', e);
+  }
+}
+
+async function sendWorkerMessage() {
+  const input = document.getElementById('workerChatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text || !workerChatConversationId) return;
+  input.value = '';
+  try {
+    await VoyDB.sendMessage(workerChatConversationId, 'worker', text);
+    await renderWorkerChatMessages();
+  } catch (e) {
+    VOY.showToast('Error enviando mensaje', 'error');
+  }
+}
+
+function handleWorkerChatKey(e) {
+  if (e.key === 'Enter') sendWorkerMessage();
 }
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
