@@ -551,6 +551,11 @@ function handleChatKey(e) {
   if (e.key === 'Enter') sendMessage();
 }
 
+function openChatWithWorker(workerId) {
+  selectedWorker = VOY_DATA.workers.find(w => w.id === workerId);
+  openChat();
+}
+
 function openChat() {
   if (!selectedWorker) return;
   const myId = clientData?.id || clientSession?.id || 101;
@@ -623,7 +628,7 @@ function loadActiveServices() {
           </div>
         </div>
         <div style="display:flex; gap:var(--sp-3); margin-top:var(--sp-4);">
-          <button class="btn btn-outline btn-sm" onclick="toggleChat()"><i class="fa-solid fa-comment-dots"></i> Mensaje</button>
+          <button class="btn btn-outline btn-sm" onclick="openChatWithWorker(${b.workerId})"><i class="fa-solid fa-comment-dots"></i> Mensaje</button>
           ${b.status === 'active' ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b._recordId}')"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
         </div>
       </div>
@@ -719,9 +724,20 @@ async function submitRating() {
 }
 
 /* ── Client profile ─────────────────────── */
-function loadClientProfile() {
+async function loadClientProfile() {
   const el = document.getElementById('clientProfile');
   if (!el) return;
+
+  // Si clientData no se cargó, reintentar desde Airtable
+  if (!clientData && clientSession?.email) {
+    el.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--gray-400);">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;margin-bottom:var(--sp-3);color:var(--color-primary);"></i>
+      <p>Cargando perfil...</p></div>`;
+    try {
+      clientData = await VoyDB.getClientByEmail(clientSession.email);
+    } catch(e) { /* sigue */ }
+  }
+
   const client = clientData;
   if (!client) {
     el.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--gray-400);">
