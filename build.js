@@ -10,9 +10,9 @@
 const fs   = require('fs');
 const path = require('path');
 
-const token    = process.env.VOY_AIRTABLE_TOKEN;
-const baseId   = process.env.VOY_AIRTABLE_BASE;
-const adminPwd = process.env.VOY_ADMIN_PASSWORD || 'voy2026';
+const token    = (process.env.VOY_AIRTABLE_TOKEN || '').trim();
+const baseId   = (process.env.VOY_AIRTABLE_BASE || '').trim();
+const adminPwd = (process.env.VOY_ADMIN_PASSWORD || 'voy2026').trim();
 
 if (!token || !baseId) {
   console.error('❌ Faltan variables de entorno: VOY_AIRTABLE_TOKEN y VOY_AIRTABLE_BASE');
