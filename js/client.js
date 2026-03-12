@@ -752,11 +752,19 @@ async function loadClientProfile() {
   const favCount       = favorites.size;
   const completedCount = myBookings.filter(b => b.status === 'completed').length;
   const reviewCount    = myBookings.filter(b => b.rating).length;
-  const memberSince    = client.memberSince
-    ? new Date(client.memberSince).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
-    : 'Miembro VOY';
 
-  el.innerHTML = `
+  let memberSince = 'Miembro VOY';
+  try {
+    if (client.memberSince) {
+      const ms = client.memberSince.length === 7
+        ? client.memberSince + '-01'   // "2025-01" → "2025-01-01"
+        : client.memberSince;
+      const d = new Date(ms);
+      if (!isNaN(d)) memberSince = d.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+    }
+  } catch(e) {}
+
+  try { el.innerHTML = `
     <div class="profile-grid" style="display:grid; grid-template-columns:280px 1fr; gap:var(--sp-6);">
 
       <!-- Columna izquierda -->
@@ -867,6 +875,13 @@ async function loadClientProfile() {
         </div>
       </div>
     </div>`;
+  } catch(renderErr) {
+    console.error('Error al renderizar perfil:', renderErr);
+    el.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--gray-400);">
+      <i class="fa-solid fa-circle-exclamation" style="font-size:2rem;margin-bottom:var(--sp-3);"></i>
+      <p>Error al mostrar perfil. <a href="#" onclick="location.reload()">Recargar</a></p>
+    </div>`;
+  }
 }
 
 function switchProfileTab(tab) {
