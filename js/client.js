@@ -710,54 +710,187 @@ function loadClientProfile() {
   if (!el) return;
   const client = clientData || VOY_DATA.clients[0];
   if (!client) return;
+
+  const favCount       = favorites.size;
+  const completedCount = VOY_DATA.bookings.filter(b => b.status === 'completed').length;
+  const reviewCount    = VOY_DATA.bookings.filter(b => b.rating).length;
+  const memberSince    = client.memberSince
+    ? new Date(client.memberSince).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+    : 'Miembro VOY';
+
   el.innerHTML = `
-    <div style="display:grid; grid-template-columns:300px 1fr; gap:var(--sp-6);">
-      <div class="card">
-        <div class="card-body" style="text-align:center; padding:var(--sp-8);">
-          <input type="file" id="clientAvatarInput" accept="image/*" style="display:none;" onchange="handleClientAvatarUpload(this)" />
-          <div style="position:relative;display:inline-block;margin-bottom:var(--sp-4);">
-            <img src="${client.avatar}" class="avatar avatar-xl" id="clientAvatarImg" style="width:96px;height:96px;" />
-            <button style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-radius:50%;background:var(--color-primary);color:white;border:2px solid white;cursor:pointer;font-size:11px;" onclick="document.getElementById('clientAvatarInput').click()" title="Cambiar foto"><i class="fa-solid fa-camera"></i></button>
+    <div class="profile-grid" style="display:grid; grid-template-columns:280px 1fr; gap:var(--sp-6);">
+
+      <!-- Columna izquierda -->
+      <div style="display:flex;flex-direction:column;gap:var(--sp-4);">
+        <div class="card">
+          <div class="card-body" style="text-align:center;padding:var(--sp-6);">
+            <input type="file" id="clientAvatarInput" accept="image/*" style="display:none;" onchange="handleClientAvatarUpload(this)" />
+            <div style="position:relative;display:inline-block;margin-bottom:var(--sp-4);">
+              <img src="${client.avatar || 'https://i.pravatar.cc/96'}" class="avatar avatar-xl" id="clientAvatarImg" style="width:96px;height:96px;" />
+              <button onclick="document.getElementById('clientAvatarInput').click()"
+                style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-radius:50%;background:var(--color-primary);color:white;border:2px solid white;cursor:pointer;font-size:11px;">
+                <i class="fa-solid fa-camera"></i>
+              </button>
+            </div>
+            <h2 style="font-size:var(--text-xl);font-weight:700;margin-bottom:var(--sp-1);">${client.name}</h2>
+            <p style="font-size:var(--text-xs);color:var(--gray-400);margin-bottom:var(--sp-1);">
+              <i class="fa-solid fa-location-dot" style="color:var(--color-primary);"></i> ${client.city}
+            </p>
+            <p style="font-size:var(--text-xs);color:var(--gray-400);margin-bottom:var(--sp-4);">
+              <i class="fa-solid fa-calendar" style="color:var(--color-primary);"></i> Desde ${memberSince}
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-2);background:var(--gray-50);border-radius:var(--radius-xl);padding:var(--sp-3);">
+              <div>
+                <div style="font-size:var(--text-xl);font-weight:800;color:var(--gray-900);">${completedCount}</div>
+                <div style="font-size:10px;color:var(--gray-400);">Servicios</div>
+              </div>
+              <div>
+                <div style="font-size:var(--text-xl);font-weight:800;color:var(--gray-900);">${reviewCount}</div>
+                <div style="font-size:10px;color:var(--gray-400);">Reseñas</div>
+              </div>
+              <div>
+                <div style="font-size:var(--text-xl);font-weight:800;color:var(--gray-900);">${favCount}</div>
+                <div style="font-size:10px;color:var(--gray-400);">Favoritos</div>
+              </div>
+            </div>
           </div>
-          <h2 style="font-size:var(--text-xl); font-weight:700; margin-bottom:var(--sp-1);">${client.name}</h2>
-          <p style="color:var(--gray-500); font-size:var(--text-sm); margin-bottom:var(--sp-4);">
-            <i class="fa-solid fa-location-dot" style="color:var(--color-primary);"></i> ${client.city}
-          </p>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-3); text-align:center; padding:var(--sp-4); background:var(--gray-50); border-radius:var(--radius-xl);">
-            <div><div style="font-size:var(--text-xl); font-weight:800;">${client.totalServices}</div><div style="font-size:var(--text-xs); color:var(--gray-400);">Servicios</div></div>
-            <div><div style="font-size:var(--text-xl); font-weight:800;">${VOY_DATA.bookings.filter(b=>b.rating).length}</div><div style="font-size:var(--text-xs); color:var(--gray-400);">Reseñas</div></div>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding:var(--sp-3);">
+            <button class="btn btn-ghost" style="width:100%;justify-content:flex-start;color:var(--color-danger);" onclick="logout()">
+              <i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión
+            </button>
           </div>
         </div>
       </div>
+
+      <!-- Columna derecha con tabs -->
       <div class="card">
-        <div class="card-header"><strong>Información personal</strong></div>
-        <div class="card-body">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--sp-4);">
-            <div class="input-group"><label class="input-label">Nombre completo</label><input class="input" id="cName" value="${client.name}" /></div>
-            <div class="input-group"><label class="input-label">Teléfono</label><input class="input" id="cPhone" value="${client.phone || ''}" /></div>
-            <div class="input-group"><label class="input-label">Email</label><input class="input" id="cEmail" value="${client.email || ''}" /></div>
-            <div class="input-group"><label class="input-label">Ciudad</label><input class="input" id="cCity" value="${client.city}" /></div>
+        <div style="display:flex;border-bottom:1px solid var(--gray-100);padding:0 var(--sp-5);">
+          <button id="tabInfoBtn" onclick="switchProfileTab('info')"
+            style="padding:var(--sp-4) var(--sp-4);font-size:var(--text-sm);font-weight:600;border:none;background:none;cursor:pointer;color:var(--color-primary);border-bottom:2px solid var(--color-primary);margin-bottom:-1px;">
+            <i class="fa-solid fa-user"></i> Información
+          </button>
+          <button id="tabSecBtn" onclick="switchProfileTab('seguridad')"
+            style="padding:var(--sp-4) var(--sp-4);font-size:var(--text-sm);font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;margin-bottom:-1px;">
+            <i class="fa-solid fa-lock"></i> Seguridad
+          </button>
+        </div>
+
+        <!-- Tab Información -->
+        <div id="tabInfo" class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);">
+            <div class="input-group">
+              <label class="input-label">Nombre completo</label>
+              <input class="input" id="cName" value="${client.name}" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Teléfono</label>
+              <input class="input" id="cPhone" value="${client.phone || ''}" placeholder="+56 9 xxxx xxxx" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Email</label>
+              <input class="input" id="cEmail" value="${client.email || ''}" type="email" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Ciudad</label>
+              <input class="input" id="cCity" value="${client.city}" />
+            </div>
           </div>
           <button class="btn btn-primary" style="margin-top:var(--sp-5);" onclick="saveClientProfile('${client._recordId}')">
             <i class="fa-solid fa-check"></i> Guardar cambios
           </button>
         </div>
+
+        <!-- Tab Seguridad -->
+        <div id="tabSeguridad" class="card-body" style="display:none;">
+          <div style="max-width:420px;display:flex;flex-direction:column;gap:var(--sp-4);">
+            <div style="padding:var(--sp-4);background:var(--blue-50);border-radius:var(--radius-xl);font-size:var(--text-sm);color:var(--gray-600);">
+              <i class="fa-solid fa-circle-info" style="color:var(--color-primary);"></i>
+              Debes ingresar tu contraseña actual para confirmar el cambio.
+            </div>
+            <div class="input-group">
+              <label class="input-label">Contraseña actual</label>
+              <input class="input" id="cOldPwd" type="password" placeholder="Tu contraseña actual" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Nueva contraseña</label>
+              <input class="input" id="cNewPwd" type="password" placeholder="Mínimo 6 caracteres" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Confirmar nueva contraseña</label>
+              <input class="input" id="cNewPwd2" type="password" placeholder="Repite la nueva contraseña" />
+            </div>
+            <button class="btn btn-primary" id="btnChangePwd" onclick="changeClientPassword('${client._recordId}', '${client.passwordHash || ''}')">
+              <i class="fa-solid fa-key"></i> Cambiar contraseña
+            </button>
+          </div>
+        </div>
       </div>
     </div>`;
 }
 
+function switchProfileTab(tab) {
+  const isInfo = tab === 'info';
+  document.getElementById('tabInfo').style.display      = isInfo ? '' : 'none';
+  document.getElementById('tabSeguridad').style.display = isInfo ? 'none' : '';
+  document.getElementById('tabInfoBtn').style.color        = isInfo ? 'var(--color-primary)' : 'var(--gray-400)';
+  document.getElementById('tabInfoBtn').style.borderBottom = isInfo ? '2px solid var(--color-primary)' : '2px solid transparent';
+  document.getElementById('tabSecBtn').style.color         = isInfo ? 'var(--gray-400)' : 'var(--color-primary)';
+  document.getElementById('tabSecBtn').style.borderBottom  = isInfo ? '2px solid transparent' : '2px solid var(--color-primary)';
+}
+
 async function saveClientProfile(recordId) {
+  const btn = document.querySelector('#tabInfo .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
   try {
-    await VoyDB.saveClientProfile(recordId, {
+    const updated = await VoyDB.saveClientProfile(recordId, {
       name:  document.getElementById('cName')?.value,
       phone: document.getElementById('cPhone')?.value,
       email: document.getElementById('cEmail')?.value,
       city:  document.getElementById('cCity')?.value,
     });
-    VOY_DATA.clients = await VoyDB.getClients();
-    VOY.showToast('Perfil actualizado', 'success');
+    if (clientData) { clientData.name = updated.name; clientData.phone = updated.phone; clientData.city = updated.city; }
+    const session = VoyAuth.getSession();
+    if (session) { session.name = updated.name; VoyAuth.saveSession(session); }
+    VoyAuth.applySessionToUI(VoyAuth.getSession());
+    VOY.showToast('Perfil actualizado correctamente', 'success');
   } catch (e) {
     VOY.showToast('Error al guardar perfil', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Guardar cambios'; }
+  }
+}
+
+async function changeClientPassword(recordId, currentHash) {
+  const oldPwd  = document.getElementById('cOldPwd')?.value;
+  const newPwd  = document.getElementById('cNewPwd')?.value;
+  const newPwd2 = document.getElementById('cNewPwd2')?.value;
+
+  if (!oldPwd || !newPwd || !newPwd2) { VOY.showToast('Completa todos los campos', 'error'); return; }
+  if (newPwd.length < 6)              { VOY.showToast('La contraseña debe tener al menos 6 caracteres', 'error'); return; }
+  if (newPwd !== newPwd2)             { VOY.showToast('Las contraseñas no coinciden', 'error'); return; }
+
+  const btn = document.getElementById('btnChangePwd');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verificando...'; }
+
+  try {
+    const oldHash = await VoyAuth.hashPassword(oldPwd);
+    if (oldHash !== currentHash) { VOY.showToast('Contraseña actual incorrecta', 'error'); return; }
+
+    const newHash = await VoyAuth.hashPassword(newPwd);
+    await VoyDB.saveClientProfile(recordId, { passwordHash: newHash });
+    if (clientData) clientData.passwordHash = newHash;
+
+    document.getElementById('cOldPwd').value  = '';
+    document.getElementById('cNewPwd').value  = '';
+    document.getElementById('cNewPwd2').value = '';
+    VOY.showToast('Contraseña cambiada correctamente', 'success');
+  } catch (e) {
+    VOY.showToast('Error al cambiar contraseña', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-key"></i> Cambiar contraseña'; }
   }
 }
 

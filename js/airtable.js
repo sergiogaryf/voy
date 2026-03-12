@@ -285,10 +285,11 @@ const VoyDB = (() => {
 
   async function saveClientProfile(recordId, data) {
     const fields = {};
-    if (data.name)  fields.Name  = data.name;
-    if (data.phone) fields.Phone = data.phone;
-    if (data.email) fields.Email = data.email;
-    if (data.city)  fields.City  = data.city;
+    if (data.name)         fields.Name         = data.name;
+    if (data.phone)        fields.Phone        = data.phone;
+    if (data.email)        fields.Email        = data.email;
+    if (data.city)         fields.City         = data.city;
+    if (data.passwordHash) fields.PasswordHash = data.passwordHash;
     const rec = await request(`Clients/${recordId}`, {
       method: 'PATCH',
       body: JSON.stringify({ fields }),
