@@ -65,4 +65,25 @@ const VOY_CONFIG = {
 fs.mkdirSync(path.join(publicDir, 'js'), { recursive: true });
 fs.writeFileSync(path.join(publicDir, 'js', 'config.js'), config);
 console.log('✅ js/config.js generado con credenciales');
+
+// Generar public/js/build-info.js con metadata del deploy
+const { execSync } = require('child_process');
+function git(cmd) { try { return execSync(`git ${cmd}`, { encoding: 'utf8' }).trim(); } catch { return ''; } }
+
+const buildInfo = {
+  commit:    git('rev-parse --short HEAD'),
+  branch:    process.env.VERCEL_GIT_COMMIT_REF || git('rev-parse --abbrev-ref HEAD'),
+  author:    process.env.VERCEL_GIT_COMMIT_AUTHOR_NAME || git('log -1 --format=%an'),
+  message:   process.env.VERCEL_GIT_COMMIT_MESSAGE || git('log -1 --format=%s'),
+  date:      new Date().toISOString(),
+  env:       process.env.VERCEL_ENV || 'local',
+  url:       process.env.VERCEL_URL || 'localhost',
+  repo:      'sergiogaryf/voy',
+};
+
+fs.writeFileSync(
+  path.join(publicDir, 'js', 'build-info.js'),
+  `/* Generado por build.js — no editar */\nconst VOY_BUILD = ${JSON.stringify(buildInfo, null, 2)};\n`
+);
+console.log('✅ js/build-info.js generado con metadata del deploy');
 console.log('✅ Build completado → directorio public/');
