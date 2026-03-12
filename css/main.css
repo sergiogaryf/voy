@@ -14,6 +14,9 @@ button { cursor: pointer; font-family: var(--font-sans); border: none; backgroun
 ul, ol { list-style: none; }
 input, select, textarea { font-family: var(--font-sans); }
 
+/* ── Utilidades globales ─────────────────── */
+.hidden { display: none !important; }
+
 /* ── Utilidades de layout ─────────────────── */
 .container { max-width: var(--container); margin: 0 auto; padding: 0 var(--sp-6); }
 .flex        { display: flex; }
