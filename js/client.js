@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     VoyAuth.applySessionToUI(clientSession);
     filterWorkers();
     loadActiveServices();
+    updateActiveBadge();
     loadHistorial();
     loadClientProfile();
     loadPagos();
@@ -471,6 +472,7 @@ async function confirmBooking() {
     VOY.showToast(`¡Solicitud enviada a ${selectedWorker.name}!`, 'success');
     setTimeout(() => VOY.showToast('El profesional confirmará en breve.', 'info'), 1500);
     loadActiveServices();
+    updateActiveBadge();
   } catch (e) {
     VOY.showToast('Error al crear la reserva. Intenta de nuevo.', 'error');
     console.error(e);
@@ -553,13 +555,25 @@ function openChat() {
   if (!selectedWorker) return;
   const myId = clientData?.id || clientSession?.id || 101;
   chatConversationId = `chat_w${selectedWorker.id}_c${myId}`;
-  const panel = document.getElementById('chatPanel');
-  const title = document.getElementById('chatWorkerName');
-  if (title) title.textContent = selectedWorker.name;
+  const panel  = document.getElementById('chatPanel');
+  const title  = document.getElementById('chatWorkerName');
+  const avatar = document.getElementById('chatWorkerAvatar');
+  if (title)  title.textContent = selectedWorker.name;
+  if (avatar) avatar.src = selectedWorker.avatar;
   if (panel) {
     panel.classList.add('open');
     renderChatMessages();
     startChatPolling();
+  }
+}
+
+/* ── Active badge ───────────────────────── */
+function updateActiveBadge() {
+  const count = VOY_DATA.bookings.filter(b => b.status === 'active' || b.status === 'pending').length;
+  const badge = document.querySelector('.sidebar-badge');
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? '' : 'none';
   }
 }
 
@@ -612,6 +626,7 @@ async function cancelBooking(recordId) {
     await VoyDB.updateBookingStatus(recordId, 'cancelled');
     VOY_DATA.bookings = await VoyDB.getBookings();
     loadActiveServices();
+    updateActiveBadge();
     VOY.showToast('Reserva cancelada', 'info');
   } catch (e) {
     VOY.showToast('Error al cancelar', 'error');
@@ -841,7 +856,7 @@ async function loadNotifications() {
     notifs.push({ icon: '💡', bg: '#dbeafe', text: 'No tienes notificaciones pendientes.', time: 'Ahora', unread: false });
   }
 
-  el.innerHTML = notifs.map(n => `
+  const html = notifs.map(n => `
     <div class="notif-item ${n.unread ? 'unread' : ''}">
       <div class="notif-icon" style="background:${n.bg};">${n.icon}</div>
       <div class="notif-body">
@@ -849,17 +864,16 @@ async function loadNotifications() {
         <div class="notif-time">${n.time}</div>
       </div>
     </div>`).join('');
+
+  if (el) el.innerHTML = html;
+  const elView = document.getElementById('notifListView');
+  if (elView) elView.innerHTML = html;
 }
 
 function openNotifications() { VOY.openModal('notifModal'); }
 
 function loadNotificationsView() {
-  // Rende las mismas notificaciones en la vista de página completa
-  const el = document.getElementById('notifListView');
-  if (!el) return;
-  const src = document.getElementById('notifList');
-  if (src) el.innerHTML = src.innerHTML;
-  else loadNotifications();
+  loadNotifications();
 }
 
 /* ── View switcher ──────────────────────── */
