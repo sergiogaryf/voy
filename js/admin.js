@@ -325,14 +325,33 @@ function loadUsersTable(filter = 'all') {
   const start    = (usersPage - 1) * PAGE_SIZE;
   const pageUsers = users.slice(start, start + PAGE_SIZE);
 
+  // Obtener valores únicos para filtros
+  const cities = [...new Set(users.map(u => u.city).filter(Boolean))].sort();
+  const statuses = [...new Set(users.map(u => u.status || 'active').filter(Boolean))];
+
   el.innerHTML = `
     <thead>
       <tr>
         <th>Usuario</th><th>Rol</th><th>Ciudad</th><th>Miembro desde</th>
         <th>Servicios</th><th>Estado</th><th>Acción</th>
       </tr>
+      <tr style="background:var(--gray-50);">
+        <th><input type="text" placeholder="Buscar..." id="filterName" oninput="applyTableFilters()" style="width:100%;padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;"></th>
+        <th><select id="filterRole" onchange="applyTableFilters()" style="width:100%;padding:4px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;">
+          <option value="">Todos</option><option value="cliente">Cliente</option><option value="profesional">Profesional</option>
+        </select></th>
+        <th><select id="filterCity" onchange="applyTableFilters()" style="width:100%;padding:4px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;">
+          <option value="">Todas</option>${cities.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select></th>
+        <th></th>
+        <th></th>
+        <th><select id="filterStatus" onchange="applyTableFilters()" style="width:100%;padding:4px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;">
+          <option value="">Todos</option><option value="active">Activo</option><option value="suspended">Suspendido</option>
+        </select></th>
+        <th></th>
+      </tr>
     </thead>
-    <tbody>
+    <tbody id="usersBody">
       ${pageUsers.map(u => `
       <tr id="userRow_${u._recordId}">
         <td>
@@ -418,6 +437,30 @@ async function toggleSuspend(recordId, table, name, currentStatus, btn) {
     VOY.showToast('Error al actualizar estado', 'error');
     if (btn) { btn.disabled = false; btn.textContent = currentStatus === 'suspended' ? 'Reactivar' : 'Suspender'; }
   }
+}
+
+/* ── Filtros de cabecera en tabla ──────── */
+function applyTableFilters() {
+  const nameQ  = (document.getElementById('filterName')?.value || '').toLowerCase();
+  const roleQ  = document.getElementById('filterRole')?.value || '';
+  const cityQ  = document.getElementById('filterCity')?.value || '';
+  const statusQ = document.getElementById('filterStatus')?.value || '';
+
+  const rows = document.querySelectorAll('#usersBody tr[id^="userRow_"]');
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    const name   = (cells[0]?.textContent || '').toLowerCase();
+    const role   = (cells[1]?.textContent || '').toLowerCase().trim();
+    const city   = (cells[2]?.textContent || '').trim();
+    const status = row.querySelector('.badge-red') ? 'suspended' : 'active';
+
+    const show = (!nameQ || name.includes(nameQ))
+      && (!roleQ || role.includes(roleQ))
+      && (!cityQ || city === cityQ)
+      && (!statusQ || status === statusQ);
+
+    row.style.display = show ? '' : 'none';
+  });
 }
 
 /* ── Eliminar usuario ──────────────────── */
