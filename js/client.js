@@ -1295,6 +1295,7 @@ function downloadQuotationPDF(recordId) {
     document.head.appendChild(s);
     return;
   }
+  try {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const pw = doc.internal.pageSize.getWidth();
@@ -1429,6 +1430,11 @@ function downloadQuotationPDF(recordId) {
   doc.text('Quinta Región, Chile · www.voy.cl · Documento generado automáticamente', pw / 2, ph - 6, { align: 'center' });
 
   doc.save(`Cotizacion_VOY_${q.quoteId}.pdf`);
+  VOY.showToast('PDF descargado', 'success');
+  } catch (e) {
+    console.error('PDF error:', e);
+    VOY.showToast('Error generando PDF: ' + e.message, 'error');
+  }
 }
 
 function fmtCLPClient(n) {
