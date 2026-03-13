@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadPagos();
     loadFavorites();
     loadNotifications();
+    loadPendingQuotations();
     handleURLParams();
     setTodayDate();
   } catch (e) {
@@ -475,6 +476,12 @@ async function confirmBooking() {
     // Refrescar bookings
     VOY_DATA.bookings = await VoyDB.getBookings();
 
+    // Email admin: nueva reserva
+    sendVoyEmail(clientData?.email || clientSession?.email || '', 'admin_new_booking', {
+      workerName: selectedWorker.name, clientName: clientData?.name || clientSession?.name,
+      service, price: selectedWorker.priceMin, bookingId: 'VOY-' + String(Date.now()).slice(-4),
+    });
+
     VOY.closeModal('bookingModal');
     VOY.showToast(`¡Solicitud enviada a ${selectedWorker.name}!`, 'success');
     setTimeout(() => VOY.showToast('El especialista confirmará en breve.', 'info'), 1500);
@@ -646,8 +653,17 @@ function loadActiveServices() {
 async function cancelBooking(recordId) {
   if (!confirm('¿Confirmas la cancelación?')) return;
   try {
+    const booking = VOY_DATA.bookings.find(b => b._recordId === recordId);
+    const worker = VOY_DATA.workers.find(w => w.id === booking?.workerId);
     await VoyDB.updateBookingStatus(recordId, 'cancelled');
     VOY_DATA.bookings = await VoyDB.getBookings();
+
+    // Email admin: reserva cancelada
+    sendVoyEmail(clientData?.email || clientSession?.email || '', 'admin_booking_cancelled', {
+      workerName: worker?.name, clientName: clientData?.name || clientSession?.name,
+      service: booking?.service, bookingId: booking?.id,
+    });
+
     loadActiveServices();
     updateActiveBadge();
     VOY.showToast('Reserva cancelada', 'info');
@@ -1109,6 +1125,203 @@ function showView(name, el) {
   if (name === 'perfil')    loadClientProfile();
   if (name === 'notifs')    loadNotificationsView();
   if (name === 'activos')   loadActiveServices();
+}
+
+/* ── Email helper ─────────────────────────── */
+function sendVoyEmail(to, template, extra = {}) {
+  if (!to) return;
+  fetch('/api/send-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, template, baseUrl: VOY_SITE_URL, ...extra }),
+  }).catch(e => console.warn('Email send failed:', e));
+}
+
+/* ── Quotations (client side) ────────────── */
+let clientQuotations = [];
+
+async function loadPendingQuotations() {
+  try {
+    const myId = myClientId();
+    if (!myId) return;
+    clientQuotations = await VoyDB.getQuotationsByClient(myId);
+    // Show badge on active services if pending quotations exist
+    const pending = clientQuotations.filter(q => q.status === 'pending');
+    const badge = document.getElementById('activosBadge');
+    if (badge && pending.length) {
+      const activeCount = VOY_DATA.bookings.filter(b =>
+        (b.status === 'active' || b.status === 'pending') && b.clientId === myId
+      ).length;
+      badge.textContent = activeCount + pending.length;
+      badge.style.display = '';
+    }
+    // Add quotation indicators to active services
+    addQuotationBadges();
+  } catch (e) {
+    console.warn('Error loading quotations:', e);
+  }
+}
+
+function addQuotationBadges() {
+  const pending = clientQuotations.filter(q => q.status === 'pending');
+  pending.forEach(q => {
+    // Try to find the active service card for this booking
+    const cards = document.querySelectorAll('#activeServices .card');
+    cards.forEach(card => {
+      if (card.textContent.includes(q.service) && !card.querySelector('.quote-badge')) {
+        const badge = document.createElement('div');
+        badge.className = 'quote-badge';
+        badge.style.cssText = 'background:#f5f3ff;border:1.5px solid #4f46e5;border-radius:12px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;';
+        badge.innerHTML = `<span style="font-size:13px;color:#4f46e5;font-weight:600;"><i class="fa-solid fa-file-invoice-dollar"></i> Cotización pendiente — ${fmtCLPClient(q.grandTotal)} <span class="badge-new">NUEVO</span></span>
+          <button class="btn btn-sm" style="background:#4f46e5;color:white;padding:4px 12px;font-size:12px;" onclick="event.stopPropagation();openQuotationView('${q._recordId}')">Ver cotización</button>`;
+        card.querySelector('.card-body')?.appendChild(badge);
+      }
+    });
+  });
+}
+
+function openQuotationView(quoteRecordId) {
+  const q = clientQuotations.find(x => x._recordId === quoteRecordId);
+  if (!q) return;
+
+  const materials = q.materials || [];
+  const materialsHtml = materials.length
+    ? materials.map(m => `<tr><td style="padding:6px;">${m.name}</td><td style="padding:6px;text-align:center;">${m.qty}</td><td style="padding:6px;text-align:right;">${fmtCLPClient(m.unitPrice)}</td><td style="padding:6px;text-align:right;font-weight:600;">${fmtCLPClient(m.qty * m.unitPrice)}</td></tr>`).join('')
+    : '<tr><td colspan="4" style="padding:8px;text-align:center;color:var(--gray-400);">Sin materiales</td></tr>';
+
+  document.getElementById('quoteViewBody').innerHTML = `
+    <div style="display:flex;gap:var(--sp-4);padding:var(--sp-3);background:var(--gray-50);border-radius:var(--radius-xl);margin-bottom:var(--sp-4);">
+      <div style="flex:1;"><strong>Especialista:</strong> ${q.workerName}</div>
+      <div style="flex:1;"><strong>Servicio:</strong> ${q.service}</div>
+    </div>
+    <div style="margin-bottom:var(--sp-4);">
+      <h4 style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--sp-2);">Mano de obra</h4>
+      <div style="padding:var(--sp-3);background:var(--blue-50);border-radius:var(--radius-lg);">
+        ${fmtCLPClient(q.laborRate)}/hora × ${q.laborHours} horas = <strong>${fmtCLPClient(q.laborTotal)}</strong>
+      </div>
+    </div>
+    <div style="margin-bottom:var(--sp-4);">
+      <h4 style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--sp-2);">Materiales</h4>
+      <table style="width:100%;font-size:var(--text-sm);border-collapse:collapse;">
+        <thead><tr style="color:var(--gray-400);font-size:var(--text-xs);border-bottom:1px solid var(--gray-200);"><th style="text-align:left;padding:6px;">Material</th><th style="text-align:center;padding:6px;">Cant.</th><th style="text-align:right;padding:6px;">P. Unit.</th><th style="text-align:right;padding:6px;">Total</th></tr></thead>
+        <tbody>${materialsHtml}</tbody>
+      </table>
+    </div>
+    <div style="background:#f5f3ff;border-radius:var(--radius-xl);padding:var(--sp-4);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:var(--text-sm);"><span>Subtotal</span><span>${fmtCLPClient(q.subtotal)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:var(--text-sm);color:var(--gray-500);"><span>Comisión VOY (${Math.round(q.commissionRate * 100)}%)</span><span>${fmtCLPClient(q.commission)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:var(--text-lg);font-weight:800;color:#4f46e5;border-top:1px solid #c4b5fd;padding-top:8px;"><span>TOTAL</span><span>${fmtCLPClient(q.grandTotal)}</span></div>
+    </div>
+    ${q.notes ? `<div style="margin-top:var(--sp-3);padding:var(--sp-3);background:var(--gray-50);border-radius:var(--radius-lg);font-size:var(--text-sm);color:var(--gray-600);"><strong>Notas:</strong> ${q.notes}</div>` : ''}
+    <p style="font-size:var(--text-xs);color:var(--gray-400);margin-top:var(--sp-3);">Ref: ${q.quoteId} · ${q.createdAt ? new Date(q.createdAt).toLocaleDateString('es-CL') : ''}</p>
+  `;
+
+  // Show/hide action buttons based on status
+  const actionsEl = document.getElementById('quoteViewActions');
+  if (q.status === 'pending') {
+    actionsEl.innerHTML = `
+      <button class="btn btn-ghost" onclick="VOY.closeModal('quotationViewModal')">Cerrar</button>
+      <button class="btn btn-outline" onclick="downloadQuotationPDF('${q._recordId}')"><i class="fa-solid fa-download"></i> PDF <span class="badge-new">NUEVO</span></button>
+      <button class="btn btn-danger" onclick="respondQuotation('${q._recordId}', 'rejected')"><i class="fa-solid fa-xmark"></i> Rechazar</button>
+      <button class="btn btn-success" onclick="respondQuotation('${q._recordId}', 'accepted')"><i class="fa-solid fa-check"></i> Aceptar</button>
+    `;
+  } else {
+    actionsEl.innerHTML = `
+      <button class="btn btn-ghost" onclick="VOY.closeModal('quotationViewModal')">Cerrar</button>
+      <button class="btn btn-outline" onclick="downloadQuotationPDF('${q._recordId}')"><i class="fa-solid fa-download"></i> PDF</button>
+      <span class="badge ${q.status === 'accepted' ? 'badge-green' : 'badge-red'}">${q.status === 'accepted' ? 'Aceptada' : 'Rechazada'}</span>
+    `;
+  }
+
+  VOY.openModal('quotationViewModal');
+}
+
+async function respondQuotation(recordId, action) {
+  const q = clientQuotations.find(x => x._recordId === recordId);
+  if (!q) return;
+  const label = action === 'accepted' ? 'aceptar' : 'rechazar';
+  if (!confirm(`¿Confirmas ${label} esta cotización?`)) return;
+
+  try {
+    await VoyDB.updateQuotationStatus(recordId, action);
+
+    if (action === 'accepted' && q.bookingRecordId) {
+      // Update booking price with quotation total
+      await VoyDB.updateBookingStatus(q.bookingRecordId, 'active');
+    }
+
+    // Email: quotation accepted/rejected
+    const worker = VOY_DATA.workers.find(w => w._recordId === q.workerRecordId);
+    sendVoyEmail(worker?.email || '', action === 'accepted' ? 'quotation_accepted' : 'quotation_rejected', {
+      workerName: q.workerName, clientName: q.clientName,
+      service: q.service, grandTotal: q.grandTotal, quoteId: q.quoteId,
+    });
+
+    VOY.closeModal('quotationViewModal');
+    VOY.showToast(action === 'accepted' ? 'Cotización aceptada' : 'Cotización rechazada', action === 'accepted' ? 'success' : 'info');
+
+    // Reload
+    VOY_DATA.bookings = await VoyDB.getBookings();
+    await loadPendingQuotations();
+    loadActiveServices();
+    updateActiveBadge();
+  } catch (e) {
+    VOY.showToast('Error al responder cotización', 'error');
+  }
+}
+
+function downloadQuotationPDF(recordId) {
+  const q = clientQuotations.find(x => x._recordId === recordId);
+  if (!q) return;
+  if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
+    VOY.showToast('jsPDF no disponible', 'error');
+    return;
+  }
+  // Reuse same PDF generation as worker
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pw = doc.internal.pageSize.getWidth();
+  let y = 20;
+
+  doc.setFontSize(28); doc.setTextColor(37, 99, 235); doc.text('VOY', 20, y);
+  doc.setFontSize(14); doc.setTextColor(100); doc.text('Cotización de Servicio', pw - 20, y, { align: 'right' });
+  y += 10; doc.setFontSize(10); doc.text(`Fecha: ${q.createdAt ? new Date(q.createdAt).toLocaleDateString('es-CL') : ''}`, pw - 20, y, { align: 'right' });
+  y += 5; doc.text(`Ref: ${q.quoteId}`, pw - 20, y, { align: 'right' }); y += 12;
+  doc.setDrawColor(200); doc.line(20, y, pw - 20, y); y += 10;
+  doc.setFontSize(11); doc.setTextColor(50);
+  doc.text(`Especialista: ${q.workerName}`, 20, y); doc.text(`Cliente: ${q.clientName}`, pw / 2, y); y += 6;
+  doc.text(`Servicio: ${q.service}`, 20, y); y += 12;
+
+  doc.setFontSize(12); doc.setTextColor(37, 99, 235); doc.text('Mano de Obra', 20, y); y += 8;
+  doc.setFontSize(10); doc.setTextColor(80);
+  doc.text(`${fmtCLPClient(q.laborRate)}/hora x ${q.laborHours} horas = ${fmtCLPClient(q.laborTotal)}`, 25, y); y += 10;
+
+  const mats = q.materials || [];
+  if (mats.length) {
+    doc.setFontSize(12); doc.setTextColor(37, 99, 235); doc.text('Materiales', 20, y); y += 8;
+    doc.setFontSize(9); doc.setTextColor(100);
+    mats.forEach(m => { doc.text(`${m.name}: ${m.qty} x ${fmtCLPClient(m.unitPrice)} = ${fmtCLPClient(m.qty * m.unitPrice)}`, 25, y); y += 6; });
+    y += 4;
+  }
+
+  doc.line(20, y, pw - 20, y); y += 8;
+  doc.setFontSize(11); doc.setTextColor(80);
+  doc.text('Subtotal:', 25, y); doc.text(fmtCLPClient(q.subtotal), 155, y); y += 6;
+  doc.text(`Comisión VOY (${Math.round(q.commissionRate * 100)}%):`, 25, y); doc.text(fmtCLPClient(q.commission), 155, y); y += 8;
+  doc.setFontSize(14); doc.setTextColor(37, 99, 235);
+  doc.text('TOTAL:', 25, y); doc.text(fmtCLPClient(q.grandTotal), 155, y); y += 10;
+
+  if (q.notes) { doc.setFontSize(10); doc.setTextColor(100); doc.text('Notas: ' + q.notes, 20, y); }
+
+  y = doc.internal.pageSize.getHeight() - 15;
+  doc.setFontSize(8); doc.setTextColor(150);
+  doc.text('VOY SpA — Quinta Región, Chile', pw / 2, y, { align: 'center' });
+  doc.save(`Cotizacion_${q.quoteId}.pdf`);
+}
+
+function fmtCLPClient(n) {
+  if (!n && n !== 0) return '-';
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(n);
 }
 
 /* ── Close modals on overlay click ─────── */
