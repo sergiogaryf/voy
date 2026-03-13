@@ -6,7 +6,7 @@
 const VOY_DEV = (() => {
   const REPO = 'sergiogaryf/voy';
   const DEPLOYS = {
-    sergio:    { url: 'voy-app1.vercel.app',  label: 'Sergio',    color: '#0EA5E9', initials: 'SG' },
+    sergio:    { url: 'voy-app-seven.vercel.app', label: 'Sergio', color: '#0EA5E9', initials: 'SG' },
     guillermo: { url: 'voy-app-2.vercel.app', label: 'Guillermo', color: '#10B981', initials: 'GG' },
     fusion:    { url: 'voy-app-3.vercel.app', label: 'Fusión',    color: '#8B5CF6', initials: 'F3' },
   };
