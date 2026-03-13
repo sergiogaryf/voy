@@ -380,6 +380,7 @@ function loadDashRequestsPreview() {
         <div style="font-weight:700; color:var(--color-primary);">${VOY.formatCLP(r.estimatedPrice)}</div>
         <div style="display:flex; gap:var(--sp-2);">
           <button class="btn btn-ghost btn-sm" style="padding:2px 8px; font-size:11px;" onclick="handleRequest('${r._recordId}', 'declined')">✗</button>
+          <button class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:11px; color:#4f46e5; border-color:#4f46e5;" onclick="openQuotationModal('${r._recordId}')"><i class="fa-solid fa-file-invoice-dollar"></i></button>
           <button class="btn btn-success btn-sm" style="padding:2px 8px; font-size:11px;" onclick="handleRequest('${r._recordId}', 'accepted')">✓</button>
         </div>
       </div>
