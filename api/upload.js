@@ -44,7 +44,7 @@ module.exports = async (req, res) => {
     ]);
 
     // Upload a Airtable Content API
-    const uploadUrl = `/v0/${BASE_ID}/${recordId}/${fieldId}/uploadAttachment`;
+    const uploadUrl = `/v0/${BASE_ID}/${table}/${recordId}/${fieldId}/uploadAttachment`;
 
     const result = await new Promise((resolve, reject) => {
       const options = {
