@@ -559,29 +559,33 @@ const VoyDB = (() => {
 
   /* ── Upload de avatar ────────────────────── */
   async function uploadAvatar(table, recordId, avatarFieldId, file) {
-    const url = `https://content.airtable.com/v0/${baseId()}/${recordId}/${avatarFieldId}/uploadAttachment`;
-    const formData = new FormData();
-    formData.append('file', file, file.name);
-    formData.append('filename', file.name);
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token()}` },
-      body: formData,
+    // Convertir archivo a base64
+    const fileBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
+
+    // Usar API serverless para evitar CORS
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table,
+        recordId,
+        fieldId: avatarFieldId,
+        fileName: file.name,
+        fileBase64,
+      }),
+    });
+
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Avatar upload failed: ${err?.error?.message || res.statusText}`);
+      throw new Error(`Avatar upload failed: ${err?.error || err?.detail || res.statusText}`);
     }
     const data = await res.json();
-    const attachmentUrl = data.attachments?.[0]?.thumbnails?.large?.url || data.attachments?.[0]?.url;
-    // Guardar también en campo Avatar (URL) para referencia rápida
-    if (attachmentUrl) {
-      await request(`${table}/${recordId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ fields: { Avatar: attachmentUrl } }),
-      });
-    }
-    return attachmentUrl;
+    return data.url;
   }
 
   /* ── Suspender usuarios ──────────────────── */

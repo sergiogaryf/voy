@@ -137,6 +137,7 @@ const VoyAuth = (() => {
         email: data.email.toLowerCase(),
       };
       saveSession(session);
+      sendWelcomeEmail(data.email.toLowerCase(), data.name);
       return session;
     } else {
       const client = await VoyDB.createClientAccount({
@@ -155,8 +156,18 @@ const VoyAuth = (() => {
         email: data.email.toLowerCase(),
       };
       saveSession(session);
+      sendWelcomeEmail(data.email.toLowerCase(), data.name);
       return session;
     }
+  }
+
+  /* ── Email de bienvenida (async, no bloquea) */
+  function sendWelcomeEmail(email, name) {
+    fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: email, type: 'welcome', name }),
+    }).catch(() => {}); // No bloquear si falla
   }
 
   /* ── Logout ──────────────────────────────── */
