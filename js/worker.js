@@ -1149,7 +1149,7 @@ async function submitQuotation() {
 /* ── PDF Generation (jsPDF) ──────────────── */
 function generateVoyPDF(data) {
   if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
-    VOY.showToast('jsPDF no disponible', 'error');
+    console.warn('jsPDF no disponible — PDF no generado');
     return;
   }
   const { jsPDF } = window.jspdf;
