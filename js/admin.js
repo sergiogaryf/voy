@@ -353,10 +353,14 @@ function loadUsersTable(filter = 'all') {
             ${u.status === 'suspended' ? '⛔ Suspendido' : u.role === 'profesional' ? (u.verified ? '✓ Verificado' : '! Pendiente') : '✓ Activo'}
           </span>
         </td>
-        <td>
+        <td style="display:flex;gap:4px;">
           <button class="btn btn-ghost btn-sm" style="color:${u.status === 'suspended' ? 'var(--color-success)' : 'var(--color-danger)'};"
             onclick="toggleSuspend('${u._recordId}','${u.role === 'profesional' ? 'Workers' : 'Clients'}','${u.name}','${u.status}', this)">
             ${u.status === 'suspended' ? 'Reactivar' : 'Suspender'}
+          </button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--color-danger);"
+            onclick="deleteUser('${u._recordId}','${u.role === 'profesional' ? 'Workers' : 'Clients'}','${u.name}')">
+            <i class="fa-solid fa-trash-can"></i>
           </button>
         </td>
       </tr>`).join('')}
@@ -413,6 +417,26 @@ async function toggleSuspend(recordId, table, name, currentStatus, btn) {
   } catch (e) {
     VOY.showToast('Error al actualizar estado', 'error');
     if (btn) { btn.disabled = false; btn.textContent = currentStatus === 'suspended' ? 'Reactivar' : 'Suspender'; }
+  }
+}
+
+/* ── Eliminar usuario ──────────────────── */
+async function deleteUser(recordId, table, name) {
+  if (!confirm(`¿Estás seguro de eliminar a "${name}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    await VoyDB.deleteRecord(table, recordId);
+    VOY.showToast(`${name} eliminado`, 'success');
+    // Quitar la fila de la tabla
+    const row = document.getElementById(`userRow_${recordId}`);
+    if (row) row.remove();
+    // Actualizar datos locales
+    if (table === 'Clients') {
+      VOY_DATA.clients = VOY_DATA.clients.filter(c => c._recordId !== recordId);
+    } else {
+      VOY_DATA.workers = VOY_DATA.workers.filter(w => w._recordId !== recordId);
+    }
+  } catch (e) {
+    VOY.showToast('Error al eliminar: ' + (e.message || ''), 'error');
   }
 }
 

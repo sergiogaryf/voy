@@ -596,6 +596,11 @@ const VoyDB = (() => {
     });
   }
 
+  /* ── Eliminar registro ──────────────────── */
+  async function deleteRecord(table, recordId) {
+    return request(`${table}/${recordId}`, { method: 'DELETE' });
+  }
+
   /* ── Exports públicos ────────────────────── */
   return {
     // Auth
@@ -624,6 +629,8 @@ const VoyDB = (() => {
     uploadAvatar,
     // User status
     updateUserStatus,
+    // Delete
+    deleteRecord,
     // Favoritos
     getFavorites, saveFavorites, toggleFavoriteLocal,
   };
