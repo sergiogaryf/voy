@@ -72,7 +72,7 @@ function logout() {
 }
 
 function showLoadingState() {
-  VOY.showLoading('providersList', 'Cargando profesionales...');
+  VOY.showLoading('providersList', 'Cargando especialistas...');
 }
 
 function setTodayDate() {
@@ -137,7 +137,7 @@ function filterWorkers() {
   });
 
   document.getElementById('resultsCount').textContent =
-    `${workers.length} profesional${workers.length !== 1 ? 'es' : ''} encontrado${workers.length !== 1 ? 's' : ''}`;
+    `${workers.length} especialista${workers.length !== 1 ? 's' : ''} encontrado${workers.length !== 1 ? 's' : ''}`;
 
   renderProvidersList(workers);
   updateMapMarkers(workers);
@@ -149,7 +149,14 @@ function renderProvidersList(workers) {
   if (!el) return;
 
   if (workers.length === 0) {
-    el.innerHTML = `<div class="empty-state"><i class="fa-solid fa-magnifying-glass"></i><h3>Sin resultados</h3><p>Intenta ampliar el radio de búsqueda o cambiar la categoría.</p></div>`;
+    el.innerHTML = `<div class="empty-state">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <h3>Sin resultados</h3>
+      <p>No encontramos especialistas en esta categoría.</p>
+      <button class="btn btn-primary" onclick="openRequestSpecialty()" style="margin-top:var(--sp-3);">
+        <i class="fa-solid fa-paper-plane"></i> Solicitar especialidad
+      </button>
+    </div>`;
     return;
   }
 
@@ -311,7 +318,7 @@ function openWorkerDetail(id) {
         <div style="font-size:var(--text-2xl); font-weight:800; color:var(--color-primary);">
           ${VOY.formatCLP(selectedWorker.priceMin)} – ${VOY.formatCLP(selectedWorker.priceMax)}
         </div>
-        <div style="font-size:var(--text-sm); color:var(--gray-500);">por ${selectedWorker.priceUnit} · Precio final acordado con el profesional</div>
+        <div style="font-size:var(--text-sm); color:var(--gray-500);">por ${selectedWorker.priceUnit} · Precio final acordado con el especialista</div>
       </div>
     </div>
 
@@ -425,7 +432,7 @@ function updateBookingSummary() {
       <strong style="color:var(--gray-900);">Total estimado</strong>
       <strong style="color:var(--color-primary); font-size:var(--text-lg);">${VOY.formatCLP(selectedWorker.priceMin)}</strong>
     </div>
-    <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:var(--sp-2);">El precio final se acuerda con el profesional antes del inicio del servicio.</div>`;
+    <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:var(--sp-2);">El precio final se acuerda con el especialista antes del inicio del servicio.</div>`;
 }
 
 async function confirmBooking() {
@@ -470,7 +477,7 @@ async function confirmBooking() {
 
     VOY.closeModal('bookingModal');
     VOY.showToast(`¡Solicitud enviada a ${selectedWorker.name}!`, 'success');
-    setTimeout(() => VOY.showToast('El profesional confirmará en breve.', 'info'), 1500);
+    setTimeout(() => VOY.showToast('El especialista confirmará en breve.', 'info'), 1500);
     loadActiveServices();
     updateActiveBadge();
   } catch (e) {
@@ -613,7 +620,7 @@ function loadActiveServices() {
           <img src="${worker?.avatar || ''}" class="avatar avatar-lg" />
           <div style="flex:1;">
             <div style="display:flex; align-items:center; gap:var(--sp-3); margin-bottom:var(--sp-1);">
-              <strong>${worker?.name || 'Profesional'}</strong>
+              <strong>${worker?.name || 'Especialista'}</strong>
               <span class="badge ${statusColors[b.status]}">${statusLabels[b.status]}</span>
             </div>
             <div style="font-size:var(--text-sm); color:var(--gray-600);">${b.service}</div>
@@ -660,7 +667,7 @@ function loadHistorial() {
   el.innerHTML = `
     <thead>
       <tr>
-        <th>Ref.</th><th>Servicio</th><th>Profesional</th><th>Fecha</th><th>Total</th><th>Estado</th><th>Calificación</th><th></th>
+        <th>Ref.</th><th>Servicio</th><th>Especialista</th><th>Fecha</th><th>Total</th><th>Estado</th><th>Calificación</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -672,7 +679,7 @@ function loadHistorial() {
           <td>
             <div style="display:flex; align-items:center; gap:var(--sp-2);">
               <img src="${w?.avatar || ''}" class="avatar avatar-xs" />
-              ${w?.name || 'Profesional'}
+              ${w?.name || 'Especialista'}
             </div>
           </td>
           <td>${b.date}</td>
@@ -1004,7 +1011,7 @@ function loadFavorites() {
   if (!el) return;
   const favWorkers = VOY_DATA.workers.filter(w => favorites.has(w.id));
   if (!favWorkers.length) {
-    el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-heart"></i><h3>Sin favoritos</h3><p>Guarda profesionales que te gusten para encontrarlos fácil.</p></div>';
+    el.innerHTML = '<div class="empty-state"><i class="fa-solid fa-heart"></i><h3>Sin favoritos</h3><p>Guarda especialistas que te gusten para encontrarlos fácil.</p></div>';
     return;
   }
   el.innerHTML = favWorkers.map(w => {
@@ -1035,7 +1042,7 @@ async function loadNotifications() {
 
   activeBookings.forEach(b => {
     const w = VOY_DATA.workers.find(x => x.id === b.workerId);
-    notifs.push({ icon: '✅', bg: '#d1fae5', text: `<strong>${w?.name || 'Profesional'}</strong> confirmó tu reserva para el ${b.date}.`, time: 'Reciente', unread: true });
+    notifs.push({ icon: '✅', bg: '#d1fae5', text: `<strong>${w?.name || 'Especialista'}</strong> confirmó tu reserva para el ${b.date}.`, time: 'Reciente', unread: true });
   });
   pendingRatings.forEach(b => {
     notifs.push({ icon: '⭐', bg: '#fef3c7', text: `Califica tu servicio de <strong>${b.category}</strong> del ${b.date}.`, time: 'Pendiente', unread: true });
@@ -1119,7 +1126,7 @@ function onSearchInput() {
     (w.city || '').toLowerCase().includes(q)
   ).slice(0, 6);
   if (workerMatches.length > 0) {
-    results.push({ type: 'section', label: 'Profesionales' });
+    results.push({ type: 'section', label: 'Especialistas' });
     workerMatches.forEach(w => results.push({
       type: 'worker', id: w.id, name: w.name, category: w.categoryLabel, avatar: w.avatar,
       rating: w.rating, recordId: w._recordId,
@@ -1127,7 +1134,10 @@ function onSearchInput() {
   }
 
   if (results.length === 0) {
-    box.style.display = 'none';
+    box.innerHTML = `<div class="suggest-item" onclick="openRequestSpecialty()" style="justify-content:center;color:var(--color-primary);">
+      <i class="fa-solid fa-plus-circle"></i> Solicitar "${q}" como especialidad
+    </div>`;
+    box.style.display = 'block';
     filterWorkers();
     return;
   }
@@ -1196,6 +1206,83 @@ document.addEventListener('click', (e) => {
     box.style.display = 'none';
   }
 });
+
+function openRequestSpecialty() {
+  const searchVal = document.getElementById('mainSearch')?.value || '';
+  const existingModal = document.getElementById('specialtyRequestModal');
+  if (existingModal) {
+    VOY.openModal('specialtyRequestModal');
+    return;
+  }
+  // Create modal dynamically
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'specialtyRequestModal';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-lightbulb" style="color:var(--color-warning);"></i> Solicitar especialidad</h3>
+        <button class="modal-close" onclick="VOY.closeModal('specialtyRequestModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--gray-500);font-size:var(--text-sm);margin-bottom:var(--sp-4);">
+          ¿No encuentras lo que buscas? Cuéntanos qué especialista necesitas y lo buscaremos por ti.
+        </p>
+        <div class="input-group" style="margin-bottom:var(--sp-3);">
+          <label class="input-label">Especialidad que necesitas</label>
+          <input class="input" id="reqSpecialtyName" placeholder="Ej: Decorador de interiores" value="${searchVal}" />
+        </div>
+        <div class="input-group" style="margin-bottom:var(--sp-3);">
+          <label class="input-label">Describe lo que necesitas</label>
+          <textarea class="input" id="reqSpecialtyDesc" rows="3" placeholder="Cuéntanos más sobre el servicio que buscas..."></textarea>
+        </div>
+        <div class="input-group" style="margin-bottom:var(--sp-4);">
+          <label class="input-label">Tu email de contacto</label>
+          <input class="input" id="reqSpecialtyEmail" type="email" placeholder="tu@correo.cl" value="${clientSession?.email || clientData?.email || ''}" />
+        </div>
+        <button class="btn btn-primary btn-block" id="btnSubmitSpecialty" onclick="submitSpecialtyRequest()">
+          <i class="fa-solid fa-paper-plane"></i> Enviar solicitud
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => modal.classList.add('active'), 10);
+}
+
+async function submitSpecialtyRequest() {
+  const name = document.getElementById('reqSpecialtyName')?.value.trim();
+  const desc = document.getElementById('reqSpecialtyDesc')?.value.trim();
+  const email = document.getElementById('reqSpecialtyEmail')?.value.trim();
+
+  if (!name) { VOY.showToast('Indica la especialidad que necesitas', 'warning'); return; }
+
+  const btn = document.getElementById('btnSubmitSpecialty');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; }
+
+  try {
+    await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: 'guillermogonzalezleon@gmail.com',
+        type: 'specialty_request',
+        name: clientData?.name || clientSession?.name || 'Cliente',
+        specialty: name,
+        description: desc,
+        clientEmail: email,
+      }),
+    });
+
+    VOY.closeModal('specialtyRequestModal');
+    document.getElementById('specialtyRequestModal')?.remove();
+    VOY.showToast('¡Solicitud enviada! Estamos buscando un especialista para ti.', 'success');
+    setTimeout(() => VOY.showToast('Te notificaremos cuando tengamos un especialista disponible.', 'info'), 2000);
+  } catch (e) {
+    VOY.showToast('Error al enviar. Intenta de nuevo.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar solicitud'; }
+  }
+}
 
 // Navegación con teclado en sugerencias
 document.getElementById('mainSearch')?.addEventListener('keydown', (e) => {

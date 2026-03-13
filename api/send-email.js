@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { to, type, name } = req.body;
+    const { to, type, name, specialty, description, clientEmail } = req.body;
 
     if (!to || !type) {
       return res.status(400).json({ error: 'Faltan campos: to, type' });
@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
               <h2 style="color:#111827;margin:0 0 16px;">¡Hola ${name || ''}! 👋</h2>
               <p style="color:#4b5563;line-height:1.6;font-size:15px;">
                 Tu cuenta en <strong>VOY</strong> ha sido creada exitosamente.
-                Ya puedes acceder a la plataforma y conectarte con los mejores profesionales de tu ciudad.
+                Ya puedes acceder a la plataforma y conectarte con los mejores especialistas de tu ciudad.
               </p>
               <div style="text-align:center;margin:30px 0;">
                 <a href="https://voy-app-2.vercel.app/login"
@@ -102,6 +102,68 @@ module.exports = async (req, res) => {
             </div>
           </div>`,
       },
+      specialty_request: {
+        subject: '🔍 Solicitud de nueva especialidad en VOY',
+        html: `
+          <div style="font-family:'Inter',sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;border-radius:16px;overflow:hidden;">
+            <div style="background:linear-gradient(135deg,#F59E0B,#D97706);padding:30px;text-align:center;">
+              <h1 style="color:white;margin:0;font-size:28px;">VOY</h1>
+              <p style="color:#fef3c7;margin:4px 0 0;font-size:13px;">Nueva solicitud de especialidad</p>
+            </div>
+            <div style="padding:30px;">
+              <h2 style="color:#111827;margin:0 0 16px;">Solicitud de especialidad</h2>
+              <p style="color:#4b5563;line-height:1.6;">
+                El cliente <strong>${name || 'Anónimo'}</strong> necesita un especialista que no existe en la plataforma:
+              </p>
+              <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;padding:16px;margin:16px 0;">
+                <p style="margin:0 0 8px;font-weight:700;color:#92400E;">Especialidad solicitada:</p>
+                <p style="margin:0;font-size:18px;color:#111827;">${specialty || 'No especificada'}</p>
+              </div>
+              ${description ? `<div style="background:#f3f4f6;border-radius:10px;padding:16px;margin:16px 0;">
+                <p style="margin:0 0 4px;font-weight:600;color:#374151;">Descripción:</p>
+                <p style="margin:0;color:#4b5563;">${description}</p>
+              </div>` : ''}
+              <p style="color:#6b7280;font-size:13px;margin-top:16px;">
+                📧 Email del cliente: <strong>${clientEmail || 'No proporcionado'}</strong>
+              </p>
+              <div style="text-align:center;margin:24px 0;">
+                <a href="https://voy-app-2.vercel.app/admin"
+                   style="background:#F59E0B;color:white;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:600;display:inline-block;">
+                  Ir al panel admin
+                </a>
+              </div>
+            </div>
+          </div>`,
+      },
+      new_specialty: {
+        subject: '🆕 Nuevo especialista con categoría personalizada en VOY',
+        html: `
+          <div style="font-family:'Inter',sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;border-radius:16px;overflow:hidden;">
+            <div style="background:linear-gradient(135deg,#8B5CF6,#6D28D9);padding:30px;text-align:center;">
+              <h1 style="color:white;margin:0;font-size:28px;">VOY</h1>
+              <p style="color:#DDD6FE;margin:4px 0 0;font-size:13px;">Nueva categoría sugerida</p>
+            </div>
+            <div style="padding:30px;">
+              <h2 style="color:#111827;margin:0 0 16px;">Nuevo especialista registrado</h2>
+              <p style="color:#4b5563;line-height:1.6;">
+                <strong>${name || ''}</strong> se registró como especialista con una categoría que no existe en la plataforma:
+              </p>
+              <div style="background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;padding:16px;margin:16px 0;">
+                <p style="margin:0 0 8px;font-weight:700;color:#5B21B6;">Especialidad sugerida:</p>
+                <p style="margin:0;font-size:18px;color:#111827;">${specialty || 'Otro'}</p>
+              </div>
+              <p style="color:#6b7280;font-size:13px;">
+                📧 Email: <strong>${clientEmail || 'No proporcionado'}</strong>
+              </p>
+              <div style="text-align:center;margin:24px 0;">
+                <a href="https://voy-app-2.vercel.app/admin"
+                   style="background:#8B5CF6;color:white;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:600;display:inline-block;">
+                  Revisar en admin
+                </a>
+              </div>
+            </div>
+          </div>`,
+      },
     };
 
     const template = templates[type];
@@ -110,9 +172,13 @@ module.exports = async (req, res) => {
     }
 
     // Enviar via Resend API
+    const recipients = ['specialty_request', 'new_specialty'].includes(type)
+      ? [to, 'sergiogaryf@gmail.com'].filter(Boolean)
+      : [to];
+
     const emailBody = JSON.stringify({
       from: 'VOY <onboarding@resend.dev>',
-      to: [to],
+      to: recipients,
       subject: template.subject,
       html: template.html,
     });

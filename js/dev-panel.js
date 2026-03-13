@@ -25,7 +25,7 @@ const VOY_DEV = (() => {
   function getPage() {
     const path = window.location.pathname;
     if (path.includes('/client')) return 'Cliente';
-    if (path.includes('/worker')) return 'Profesional';
+    if (path.includes('/worker')) return 'Especialista';
     if (path.includes('/admin'))  return 'Admin';
     if (path.includes('/login'))  return 'Login';
     return 'Landing';
@@ -288,7 +288,7 @@ const VOY_DEV = (() => {
         <div class="dev-section-title">Navegación rápida</div>
         <div class="dev-action-grid">
           <button onclick="VOY_DEV.goTo('/client')" class="dev-action-btn"><i class="fa-solid fa-user"></i> Cliente</button>
-          <button onclick="VOY_DEV.goTo('/worker')" class="dev-action-btn"><i class="fa-solid fa-hard-hat"></i> Profesional</button>
+          <button onclick="VOY_DEV.goTo('/worker')" class="dev-action-btn"><i class="fa-solid fa-hard-hat"></i> Especialista</button>
           <button onclick="VOY_DEV.goTo('/admin')" class="dev-action-btn"><i class="fa-solid fa-shield-halved"></i> Admin</button>
           <button onclick="VOY_DEV.goTo('/')" class="dev-action-btn"><i class="fa-solid fa-house"></i> Landing</button>
         </div>
@@ -326,7 +326,7 @@ const VOY_DEV = (() => {
               <span style="color:#e0e0e0;">sofia.mendoza@gmail.com · demo1234</span>
             </div>
             <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #2a2a4a;">
-              <span style="color:#888;">Profesional</span>
+              <span style="color:#888;">Especialista</span>
               <span style="color:#e0e0e0;">carlos.munoz@gmail.com · demo1234</span>
             </div>
             <div style="display:flex;justify-content:space-between;padding:4px 0;">

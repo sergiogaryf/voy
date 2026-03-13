@@ -54,7 +54,7 @@ function setEl(id, val) {
 function updateDashboardGreeting() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
-  const firstName = workerData?.name?.split(' ')[0] || 'Profesional';
+  const firstName = workerData?.name?.split(' ')[0] || 'Especialista';
   const now = new Date();
   const days   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -544,7 +544,7 @@ function loadWorkerProfile() {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><strong>Información profesional</strong></div>
+        <div class="card-header"><strong>Información del especialista</strong></div>
         <div class="card-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);">
             <div class="input-group"><label class="input-label">Nombre completo</label><input class="input" id="wName" value="${w.name}" /></div>
@@ -552,7 +552,7 @@ function loadWorkerProfile() {
             <div class="input-group"><label class="input-label">Email</label><input class="input" id="wEmail" value="${w.email || ''}" /></div>
             <div class="input-group"><label class="input-label">Ciudad</label><input class="input" id="wCity" value="${w.city}" /></div>
             <div class="input-group" style="grid-column:1/-1;">
-              <label class="input-label">Descripción profesional</label>
+              <label class="input-label">Descripción del especialista</label>
               <textarea class="input" id="wBio" rows="3">${w.bio}</textarea>
             </div>
             <div class="input-group"><label class="input-label">Precio mínimo (CLP)</label><input class="input" id="wPriceMin" type="number" value="${w.priceMin}" /></div>
@@ -562,7 +562,7 @@ function loadWorkerProfile() {
             <label class="input-label" style="margin-bottom:var(--sp-3);">Especialidades</label>
             <div style="display:flex;flex-wrap:wrap;gap:var(--sp-2);">
               ${w.skills.map(s => `<span class="skill-tag">${s}</span>`).join('')}
-              <button class="btn btn-outline btn-sm" onclick="VOY.showToast('Agregar especialidad próximamente', 'info')"><i class="fa-solid fa-plus"></i> Agregar</button>
+              <button class="btn btn-outline btn-sm" onclick="addWorkerSpecialty()"><i class="fa-solid fa-plus"></i> Agregar</button>
             </div>
           </div>
           <button class="btn btn-primary" style="margin-top:var(--sp-5);" onclick="saveWorkerProfile()">
@@ -592,6 +592,29 @@ async function saveWorkerProfile() {
   } catch (e) {
     VOY.showToast('Error al guardar perfil', 'error');
   }
+}
+
+function addWorkerSpecialty() {
+  const specialty = prompt('Escribe la nueva especialidad:');
+  if (!specialty || !specialty.trim()) return;
+  const trimmed = specialty.trim();
+
+  // Add to skills display immediately
+  const skillsContainer = document.querySelector('.skill-tag')?.parentElement;
+  if (skillsContainer) {
+    const tag = document.createElement('span');
+    tag.className = 'skill-tag';
+    tag.textContent = trimmed;
+    const addBtn = skillsContainer.querySelector('.btn');
+    skillsContainer.insertBefore(tag, addBtn);
+  }
+
+  // Update worker data
+  if (workerData) {
+    workerData.skills = [...(workerData.skills || []), trimmed];
+  }
+
+  VOY.showToast(`Especialidad "${trimmed}" agregada. Guarda tus cambios.`, 'success');
 }
 
 /* ── Verification ───────────────────────── */
@@ -630,7 +653,7 @@ async function loadVerification() {
   const docTypes = [
     { key: 'cedula',       icon: 'fa-id-card',     title: 'Cédula de identidad',       desc: 'Sube una foto de ambos lados de tu cédula.', accept: 'image/*' },
     { key: 'selfie',       icon: 'fa-camera',       title: 'Foto con cédula',           desc: 'Una selfie sosteniendo tu cédula de identidad.', accept: 'image/*' },
-    { key: 'certificado',  icon: 'fa-file-lines',   title: 'Certificación profesional', desc: 'Sube tu título o certificado de oficio.', accept: 'image/*,.pdf' },
+    { key: 'certificado',  icon: 'fa-file-lines',   title: 'Certificación del especialista', desc: 'Sube tu título o certificado de oficio.', accept: 'image/*,.pdf' },
   ];
 
   el.innerHTML = `

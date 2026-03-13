@@ -92,7 +92,7 @@
   <div class="topbar-center">
     <div class="topbar-search" style="position:relative;">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" placeholder="Buscar servicio, profesional..." id="mainSearch" oninput="onSearchInput()" autocomplete="off" />
+      <input type="text" placeholder="Buscar servicio, especialista..." id="mainSearch" oninput="onSearchInput()" autocomplete="off" />
       <div id="searchSuggestions" class="search-suggestions" style="display:none;"></div>
     </div>
   </div>
@@ -145,6 +145,10 @@
       </a>
       <a class="sidebar-link" onclick="showView('perfil', this)">
         <i class="fa-solid fa-user-circle"></i> Mi perfil
+      </a>
+      <span class="sidebar-section-label">Soporte</span>
+      <a class="sidebar-link" onclick="openRequestSpecialty()" style="color:var(--color-warning);">
+        <i class="fa-solid fa-lightbulb"></i> Solicitar especialidad
       </a>
     </nav>
     <div class="sidebar-footer">
@@ -202,10 +206,15 @@
           </div>
           <!-- Results count -->
           <div style="display:flex; align-items:center; justify-content:space-between; padding: 0 var(--sp-1);">
-            <span id="resultsCount" style="font-size:var(--text-sm); color:var(--gray-500);">10 profesionales encontrados</span>
-            <div class="view-tabs" style="padding: 2px; width: auto;">
-              <button class="view-tab active" id="tabList" onclick="setListView('list')"><i class="fa-solid fa-list"></i></button>
-              <button class="view-tab" id="tabGrid" onclick="setListView('grid')"><i class="fa-solid fa-grip"></i></button>
+            <span id="resultsCount" style="font-size:var(--text-sm); color:var(--gray-500);">10 especialistas encontrados</span>
+            <div style="display:flex;align-items:center;gap:var(--sp-2);">
+              <button class="btn btn-ghost btn-sm" onclick="openRequestSpecialty()" style="font-size:11px;color:var(--color-warning);" title="¿No encuentras lo que buscas?">
+                <i class="fa-solid fa-lightbulb"></i> Solicitar especialidad
+              </button>
+              <div class="view-tabs" style="padding: 2px; width: auto;">
+                <button class="view-tab active" id="tabList" onclick="setListView('list')"><i class="fa-solid fa-list"></i></button>
+                <button class="view-tab" id="tabGrid" onclick="setListView('grid')"><i class="fa-solid fa-grip"></i></button>
+              </div>
             </div>
           </div>
           <!-- Providers list -->
@@ -273,7 +282,7 @@
     <div class="chat-header">
       <img src="https://i.pravatar.cc/40?img=11" alt="" class="avatar avatar-sm" id="chatWorkerAvatar" />
       <div class="chat-header-info">
-        <div class="chat-header-name" id="chatWorkerName">Profesional</div>
+        <div class="chat-header-name" id="chatWorkerName">Especialista</div>
         <div class="chat-header-status"><span class="status-dot online" style="display:inline-block;"></span> En línea</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="toggleChat()"><i class="fa-solid fa-xmark"></i></button>

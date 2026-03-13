@@ -9,6 +9,29 @@ const PAGE_SIZE = 10;
 let usersPage = 1;
 let transPage = 1;
 
+/* ── Sorting state ─────────────────────── */
+let usersSortCol = null, usersSortDir = 'asc';
+let transSortCol = null, transSortDir = 'asc';
+let _chartInstances = {};
+
+function sortData(data, col, dir) {
+  if (col == null) return data;
+  return [...data].sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (va == null) va = '';
+    if (vb == null) vb = '';
+    if (typeof va === 'number' && typeof vb === 'number') return dir === 'asc' ? va - vb : vb - va;
+    return dir === 'asc' ? String(va).localeCompare(String(vb), 'es') : String(vb).localeCompare(String(va), 'es');
+  });
+}
+
+function makeSortableHeader(label, colKey, currentCol, currentDir, onClickFn) {
+  const isActive = currentCol === colKey;
+  const arrow = isActive ? (currentDir === 'asc' ? '▲' : '▼') : '▲';
+  const cls = isActive ? currentDir : '';
+  return `<th class="th-sortable ${cls}" onclick="${onClickFn}('${colKey}')">${label}<span class="sort-arrow">${arrow}</span></th>`;
+}
+
 /* ── Paginación helper ───────────────────── */
 function renderPagination(containerId, currentPage, totalItems, onPageChange) {
   const totalPages = Math.ceil(totalItems / PAGE_SIZE);
@@ -108,34 +131,48 @@ function loadAdminStats() {
   }
 }
 
-/* ── Admin chart ────────────────────────── */
+/* ── Admin chart (Chart.js) ─────────────── */
 function buildAdminChart() {
   const el = document.getElementById('adminChart');
   if (!el) return;
-  // Agrupar transacciones por mes
-  const monthCounts = {};
-  adminTransactions.forEach(t => {
-    const m = t.date?.split(' ')[1] || 'Mar';
-    monthCounts[m] = (monthCounts[m] || 0) + 1;
-  });
+  if (_chartInstances.admin) _chartInstances.admin.destroy();
+
+  const marReal = adminTransactions.filter(t => t.date?.includes('Mar')).length || 0;
   const months = [
     { m: 'Oct', v: 620 }, { m: 'Nov', v: 780 }, { m: 'Dic', v: 950 },
     { m: 'Ene', v: 840 }, { m: 'Feb', v: 1020 },
-    { m: 'Mar', v: Math.max(adminTransactions.filter(t => t.date?.includes('Mar')).length || 0, 823), hl: true },
+    { m: 'Mar', v: Math.max(marReal, 823) },
   ];
-  const max = Math.max(...months.map(x => x.v));
-  el.innerHTML = months.map(m => `
-    <div class="admin-bar-wrap">
-      <div style="font-size:9px;color:var(--gray-500);margin-bottom:2px;">${m.v}</div>
-      <div class="admin-bar ${m.hl ? 'highlight' : ''}" style="height:${Math.round(m.v/max*100)}%;" title="${m.v} servicios"></div>
-      <span class="admin-bar-label">${m.m}</span>
-    </div>`).join('');
+
+  const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() || '#2563EB';
+
+  _chartInstances.admin = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: months.map(m => m.m),
+      datasets: [{
+        label: 'Servicios',
+        data: months.map(m => m.v),
+        backgroundColor: months.map((m, i) => i === months.length - 1 ? primaryColor : primaryColor + '66'),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
 }
 
-/* ── Category breakdown ─────────────────── */
+/* ── Category breakdown (Chart.js) ─────── */
 function buildCategoryBreakdown() {
   const el = document.getElementById('categoryBreakdown');
   if (!el) return;
+  if (_chartInstances.category) _chartInstances.category.destroy();
 
   const totals = {};
   VOY_DATA.bookings.forEach(b => {
@@ -144,29 +181,36 @@ function buildCategoryBreakdown() {
   const total = Object.values(totals).reduce((a,b)=>a+b,0) || 1;
 
   const data = VOY_DATA.categories.map(c => ({
-    id: c.id, label: c.label, color: c.color,
+    label: c.label, color: c.color,
     pct: Math.round((totals[c.id] || 0) / total * 100),
   })).filter(d => d.pct > 0);
 
-  // Si no hay bookings reales, usar datos demo
   const display = data.length ? data : [
-    { id:'gasfiteria',   label:'Gasfitería',   color:'#2563EB', pct:28 },
-    { id:'electricidad', label:'Electricidad',  color:'#0EA5E9', pct:22 },
-    { id:'limpieza',     label:'Limpieza',      color:'#14B8A6', pct:18 },
-    { id:'belleza',      label:'Belleza',        color:'#EC4899', pct:14 },
-    { id:'mecanica',     label:'Mecánica',       color:'#F59E0B', pct:9  },
-    { id:'otros',        label:'Otros',          color:'#6B7280', pct:9  },
+    { label:'Gasfitería',  color:'#2563EB', pct:28 },
+    { label:'Electricidad', color:'#0EA5E9', pct:22 },
+    { label:'Limpieza',    color:'#14B8A6', pct:18 },
+    { label:'Belleza',     color:'#EC4899', pct:14 },
+    { label:'Mecánica',    color:'#F59E0B', pct:9  },
+    { label:'Otros',       color:'#6B7280', pct:9  },
   ];
 
-  el.innerHTML = display.map(d => `
-    <div style="display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-3);">
-      <div style="width:10px;height:10px;border-radius:50%;background:${d.color};flex-shrink:0;"></div>
-      <span style="flex:1;font-size:var(--text-sm);color:var(--gray-700);">${d.label}</span>
-      <div style="flex:2;height:6px;background:var(--gray-100);border-radius:4px;">
-        <div style="height:6px;width:${d.pct}%;background:${d.color};border-radius:4px;"></div>
-      </div>
-      <span style="font-size:var(--text-xs);font-weight:600;color:var(--gray-500);min-width:28px;text-align:right;">${d.pct}%</span>
-    </div>`).join('');
+  _chartInstances.category = new Chart(el, {
+    type: 'doughnut',
+    data: {
+      labels: display.map(d => d.label),
+      datasets: [{
+        data: display.map(d => d.pct),
+        backgroundColor: display.map(d => d.color),
+        borderWidth: 2, borderColor: '#fff',
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, padding: 8, font: { size: 11 } } },
+      }
+    }
+  });
 }
 
 /* ── Pending verifications preview ─────── */
@@ -289,7 +333,13 @@ function loadRecentTransactions() {
   }
   el.innerHTML = `
     <table class="data-table">
-      <thead><tr><th>Ref.</th><th>Cliente</th><th>Servicio</th><th>Total</th><th>Estado</th></tr></thead>
+      <thead><tr>
+        <th class="th-sortable" onclick="sortRecentTrans('id')">Ref.<span class="sort-arrow">▲</span></th>
+        <th class="th-sortable" onclick="sortRecentTrans('client')">Cliente<span class="sort-arrow">▲</span></th>
+        <th class="th-sortable" onclick="sortRecentTrans('svc')">Servicio<span class="sort-arrow">▲</span></th>
+        <th class="th-sortable" onclick="sortRecentTrans('gross')">Total<span class="sort-arrow">▲</span></th>
+        <th class="th-sortable" onclick="sortRecentTrans('status')">Estado<span class="sort-arrow">▲</span></th>
+      </tr></thead>
       <tbody>
         ${recent.map(t => `
         <tr>
@@ -301,6 +351,27 @@ function loadRecentTransactions() {
         </tr>`).join('')}
       </tbody>
     </table>`;
+}
+
+let recentSortCol = null, recentSortDir = 'asc';
+function sortRecentTrans(col) {
+  if (recentSortCol === col) { recentSortDir = recentSortDir === 'asc' ? 'desc' : 'asc'; }
+  else { recentSortCol = col; recentSortDir = 'asc'; }
+  const el = document.getElementById('recentTransactions');
+  if (!el) return;
+  let recent = adminTransactions.slice(0, 5);
+  recent = sortData(recent, recentSortCol, recentSortDir);
+  const tbody = el.querySelector('tbody');
+  if (tbody) {
+    tbody.innerHTML = recent.map(t => `
+      <tr>
+        <td><code style="font-size:var(--text-xs);background:var(--gray-100);padding:2px 6px;border-radius:4px;">${t.id}</code></td>
+        <td>${t.client}</td>
+        <td>${t.svc} · ${t.worker}</td>
+        <td style="font-weight:600;color:var(--color-primary);">${VOY.formatCLP(t.gross)}</td>
+        <td><span class="badge ${t.status === 'completed' ? 'badge-green' : t.status === 'pending' ? 'badge-yellow' : 'badge-red'}">${t.status === 'completed' ? 'Completado' : t.status === 'pending' ? 'Pendiente' : 'Devuelto'}</span></td>
+      </tr>`).join('');
+  }
 }
 
 /* ── Users table ────────────────────────── */
@@ -320,7 +391,8 @@ function loadUsersTable(filter = 'all') {
     role: 'profesional', category: w.categoryLabel, verified: w.verified, rating: w.rating,
     status: w.status || 'active',
   }));
-  const users = [...clients, ...workers].filter(u => filter === 'all' || u.role === filter);
+  let users = [...clients, ...workers].filter(u => filter === 'all' || u.role === filter);
+  users = sortData(users, usersSortCol, usersSortDir);
 
   const start    = (usersPage - 1) * PAGE_SIZE;
   const pageUsers = users.slice(start, start + PAGE_SIZE);
@@ -332,13 +404,18 @@ function loadUsersTable(filter = 'all') {
   el.innerHTML = `
     <thead>
       <tr>
-        <th>Usuario</th><th>Rol</th><th>Ciudad</th><th>Miembro desde</th>
-        <th>Servicios</th><th>Estado</th><th>Acción</th>
+        ${makeSortableHeader('Usuario','name',usersSortCol,usersSortDir,'sortUsersBy')}
+        ${makeSortableHeader('Rol','role',usersSortCol,usersSortDir,'sortUsersBy')}
+        ${makeSortableHeader('Ciudad','city',usersSortCol,usersSortDir,'sortUsersBy')}
+        ${makeSortableHeader('Miembro desde','memberSince',usersSortCol,usersSortDir,'sortUsersBy')}
+        ${makeSortableHeader('Servicios','totalServices',usersSortCol,usersSortDir,'sortUsersBy')}
+        ${makeSortableHeader('Estado','status',usersSortCol,usersSortDir,'sortUsersBy')}
+        <th>Acción</th>
       </tr>
       <tr style="background:var(--gray-50);">
         <th><input type="text" placeholder="Buscar..." id="filterName" oninput="applyTableFilters()" style="width:100%;padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;"></th>
         <th><select id="filterRole" onchange="applyTableFilters()" style="width:100%;padding:4px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;">
-          <option value="">Todos</option><option value="cliente">Cliente</option><option value="profesional">Profesional</option>
+          <option value="">Todos</option><option value="cliente">Cliente</option><option value="profesional">Especialista</option>
         </select></th>
         <th><select id="filterCity" onchange="applyTableFilters()" style="width:100%;padding:4px;border:1px solid var(--gray-200);border-radius:6px;font-size:12px;">
           <option value="">Todas</option>${cities.map(c => `<option value="${c}">${c}</option>`).join('')}
@@ -363,7 +440,7 @@ function loadUsersTable(filter = 'all') {
             </div>
           </div>
         </td>
-        <td><span class="badge ${u.role === 'profesional' ? 'badge-blue' : 'badge-gray'}">${u.role}</span></td>
+        <td><span class="badge ${u.role === 'profesional' ? 'badge-blue' : 'badge-gray'}">${u.role === 'profesional' ? 'especialista' : u.role}</span></td>
         <td>${u.city}</td>
         <td>${u.memberSince}</td>
         <td>${u.totalServices}</td>
@@ -409,6 +486,28 @@ function setUsersPage(page) {
 function filterUsers(val) {
   usersPage = 1;
   loadUsersTable(val);
+}
+
+function sortUsersBy(col) {
+  if (usersSortCol === col) {
+    usersSortDir = usersSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    usersSortCol = col;
+    usersSortDir = 'asc';
+  }
+  usersPage = 1;
+  loadUsersTable();
+}
+
+function sortTransBy(col) {
+  if (transSortCol === col) {
+    transSortDir = transSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    transSortCol = col;
+    transSortDir = 'asc';
+  }
+  transPage = 1;
+  loadTransTable();
 }
 
 async function toggleSuspend(recordId, table, name, currentStatus, btn) {
@@ -494,11 +593,15 @@ function loadTransTable() {
     .map(b => {
       const w = VOY_DATA.workers.find(x => x.id === b.workerId);
       const c = VOY_DATA.clients.find(x => x.id === b.clientId);
-      return { id: b.id, date: b.date, client: c?.name || 'Cliente', worker: w?.name || 'Profesional', svc: b.category, gross: b.price, status: 'completed' };
+      return { id: b.id, date: b.date, client: c?.name || 'Cliente', worker: w?.name || 'Especialista', svc: b.category, gross: b.price, status: 'completed' };
     });
 
-  const allSorted = [...adminTransactions, ...bookingTxs]
-    .sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+  let allSorted = [...adminTransactions, ...bookingTxs];
+  if (transSortCol) {
+    allSorted = sortData(allSorted, transSortCol, transSortDir);
+  } else {
+    allSorted.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+  }
   const all = allSorted.slice((transPage - 1) * PAGE_SIZE, transPage * PAGE_SIZE);
 
   const statusMap = {
@@ -509,7 +612,16 @@ function loadTransTable() {
 
   el.innerHTML = `
     <thead>
-      <tr><th>Ref.</th><th>Fecha</th><th>Cliente</th><th>Profesional</th><th>Servicio</th><th>Total</th><th>Comisión</th><th>Estado</th></tr>
+      <tr>
+        ${makeSortableHeader('Ref.','id',transSortCol,transSortDir,'sortTransBy')}
+        ${makeSortableHeader('Fecha','date',transSortCol,transSortDir,'sortTransBy')}
+        ${makeSortableHeader('Cliente','client',transSortCol,transSortDir,'sortTransBy')}
+        ${makeSortableHeader('Especialista','worker',transSortCol,transSortDir,'sortTransBy')}
+        ${makeSortableHeader('Servicio','svc',transSortCol,transSortDir,'sortTransBy')}
+        ${makeSortableHeader('Total','gross',transSortCol,transSortDir,'sortTransBy')}
+        <th>Comisión</th>
+        ${makeSortableHeader('Estado','status',transSortCol,transSortDir,'sortTransBy')}
+      </tr>
     </thead>
     <tbody>
       ${all.map(t => {
@@ -572,7 +684,7 @@ function loadCategoriesAdmin() {
             </div>
             <div style="flex:1;">
               <div style="font-weight:700;" id="catLabel_${cat.id}">${cat.label}</div>
-              <div style="font-size:var(--text-xs);color:var(--gray-400);">${count} profesionales · ${bookingCount} reservas</div>
+              <div style="font-size:var(--text-xs);color:var(--gray-400);">${count} especialistas · ${bookingCount} reservas</div>
             </div>
             <div style="display:flex;gap:var(--sp-2);">
               <button class="btn btn-ghost btn-sm btn-icon" onclick="toggleCatEdit('${cat.id}','${cat.label}','${cat.icon}')">
@@ -640,7 +752,7 @@ function loadConfigView() {
 
   const toggles = [
     { key: 'clientRegistration',  label: 'Registro de clientes',      default: true  },
-    { key: 'workerRegistration',  label: 'Registro de profesionales',  default: true  },
+    { key: 'workerRegistration',  label: 'Registro de especialistas',  default: true  },
     { key: 'onlinePayments',      label: 'Pagos online',               default: true  },
     { key: 'emailNotifications',  label: 'Notificaciones email',       default: true  },
     { key: 'pushNotifications',   label: 'Notificaciones push',        default: false },

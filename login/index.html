@@ -250,7 +250,7 @@
           </div>
           <div class="demo-account" onclick="fillDemo('profesional')">
             <div>
-              <div class="demo-account-label"><i class="fa-solid fa-briefcase" style="color:var(--color-success)"></i> Profesional</div>
+              <div class="demo-account-label"><i class="fa-solid fa-briefcase" style="color:var(--color-success)"></i> Especialista</div>
               <div class="demo-account-hint">carlos.munoz@gmail.com · demo1234</div>
             </div>
             <i class="fa-solid fa-arrow-up-right-from-square" style="color:var(--gray-300)"></i>
@@ -279,7 +279,7 @@
           </div>
           <div class="role-btn" id="roleProfesional" onclick="selectRole('profesional')">
             <i class="fa-solid fa-briefcase"></i>
-            <span>Soy profesional</span>
+            <span>Soy especialista</span>
           </div>
         </div>
       </div>
@@ -322,6 +322,11 @@
           <option value="cooking">Cocina</option>
           <option value="other">Otro</option>
         </select>
+      </div>
+      <div class="field hidden" id="customCategoryWrap">
+        <label>Describe tu especialidad</label>
+        <input id="registerCustomCategory" type="text" class="input" placeholder="Ej: Decoración de interiores, Cerrajería..." />
+        <p style="font-size:12px;color:var(--gray-400);margin-top:4px;">Si tu especialidad no está en la lista, descríbela y la agregaremos.</p>
       </div>
       <div class="field">
         <label>Contraseña</label>
@@ -369,7 +374,12 @@
     document.getElementById('roleCliente').classList.toggle('active', role === 'cliente');
     document.getElementById('roleProfesional').classList.toggle('active', role === 'profesional');
     document.getElementById('workerCategoryWrap').classList.toggle('hidden', role !== 'profesional');
+    document.getElementById('customCategoryWrap')?.classList.add('hidden');
   }
+
+  document.getElementById('registerCategory')?.addEventListener('change', function() {
+    document.getElementById('customCategoryWrap')?.classList.toggle('hidden', this.value !== 'other');
+  });
 
   function fillDemo(type) {
     const accounts = {
@@ -436,6 +446,21 @@
     setLoading('btnRegister', true);
     try {
       const session = await VoyAuth.register({ name, email, phone, city, category, password, role });
+      // If custom category, notify admins
+      const customCat = document.getElementById('registerCustomCategory')?.value?.trim();
+      if (role === 'profesional' && (category === 'other' || customCat)) {
+        fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: 'guillermogonzalezleon@gmail.com',
+            type: 'new_specialty',
+            name: name,
+            specialty: customCat || category,
+            clientEmail: email,
+          }),
+        }).catch(() => {});
+      }
       const routes  = { cliente: '/client/', profesional: '/worker/' };
       window.location.href = routes[session.role] || '/';
     } catch (e) {
