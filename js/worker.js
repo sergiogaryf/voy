@@ -1031,10 +1031,10 @@ function renderMaterialRows() {
   if (!el) return;
   el.innerHTML = quotationMaterials.map((m, i) => `
     <tr>
-      <td><input class="input" style="font-size:13px;padding:6px;" value="${m.name}" onchange="quotationMaterials[${i}].name=this.value" /></td>
-      <td><input class="input" type="number" min="1" style="width:60px;font-size:13px;padding:6px;" value="${m.qty}" onchange="quotationMaterials[${i}].qty=Number(this.value);recalcQuotation()" /></td>
-      <td><input class="input" type="number" min="0" style="width:100px;font-size:13px;padding:6px;" value="${m.unitPrice}" onchange="quotationMaterials[${i}].unitPrice=Number(this.value);recalcQuotation()" /></td>
-      <td style="font-weight:600;text-align:right;">${VOY.formatCLP(m.qty * m.unitPrice)}</td>
+      <td><input class="input" style="font-size:13px;padding:6px;" value="${m.name}" oninput="quotationMaterials[${i}].name=this.value" /></td>
+      <td><input class="input" type="number" min="1" style="width:60px;font-size:13px;padding:6px;" value="${m.qty}" oninput="quotationMaterials[${i}].qty=Number(this.value);recalcQuotation()" /></td>
+      <td><input class="input" type="number" min="0" style="width:100px;font-size:13px;padding:6px;" value="${m.unitPrice}" oninput="quotationMaterials[${i}].unitPrice=Number(this.value);recalcQuotation()" /></td>
+      <td style="font-weight:600;text-align:right;" id="matTotal-${i}">${VOY.formatCLP(m.qty * m.unitPrice)}</td>
       <td><button class="btn btn-ghost btn-sm" style="color:var(--color-danger);padding:2px 6px;" onclick="removeMaterialRow(${i})"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`).join('');
 }
@@ -1066,6 +1066,10 @@ function recalcQuotation() {
   document.getElementById('qSubtotal').textContent = VOY.formatCLP(subtotal);
   document.getElementById('qCommission').textContent = VOY.formatCLP(commission);
   document.getElementById('qGrandTotal').textContent = VOY.formatCLP(grandTotal);
+  quotationMaterials.forEach((m, i) => {
+    const td = document.getElementById('matTotal-' + i);
+    if (td) td.textContent = VOY.formatCLP(m.qty * m.unitPrice);
+  });
 }
 
 async function submitQuotation() {
