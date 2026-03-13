@@ -1301,20 +1301,20 @@ function downloadQuotationPDF(recordId) {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
 
-  // Marca de agua
-  doc.setFontSize(120);
-  doc.setTextColor(230, 230, 240);
-  doc.text('VOY', pw / 2, ph / 2, { align: 'center', angle: 45 });
+  // Marca de agua centrada
+  doc.setFontSize(140);
+  doc.setTextColor(240, 237, 250);
+  doc.text('VOY', pw / 2, ph / 2 + 20, { align: 'center' });
 
   // Franja superior
   doc.setFillColor(124, 58, 237);
   doc.rect(0, 0, pw, 35, 'F');
   doc.setFontSize(28);
   doc.setTextColor(255, 255, 255);
-  doc.setFont(undefined, 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text('VOY', 20, 24);
   doc.setFontSize(13);
-  doc.setFont(undefined, 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text('Cotización de Servicio', pw - 20, 18, { align: 'right' });
   doc.setFontSize(10);
   doc.text(`${q.quoteId} · ${q.createdAt ? new Date(q.createdAt).toLocaleDateString('es-CL') : ''}`, pw - 20, 28, { align: 'right' });
@@ -1326,15 +1326,15 @@ function downloadQuotationPDF(recordId) {
   doc.roundedRect(20, y - 5, pw - 40, 28, 3, 3, 'F');
   doc.setFontSize(10);
   doc.setTextColor(80);
-  doc.setFont(undefined, 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text('Especialista:', 25, y + 4);
   doc.text('Cliente:', pw / 2, y + 4);
-  doc.setFont(undefined, 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text(q.workerName || '', 25, y + 12);
   doc.text(q.clientName || '', pw / 2, y + 12);
-  doc.setFont(undefined, 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text('Servicio:', 25, y + 20);
-  doc.setFont(undefined, 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text(q.service || '', 65, y + 20);
   y += 35;
 
@@ -1343,15 +1343,15 @@ function downloadQuotationPDF(recordId) {
   doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
   doc.setFontSize(11);
   doc.setTextColor(255);
-  doc.setFont(undefined, 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text('Mano de Obra', 25, y + 6);
   y += 14;
   doc.setTextColor(60);
   doc.setFontSize(10);
-  doc.setFont(undefined, 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text(`Tarifa/hora: ${fmtCLPClient(q.laborRate)}`, 25, y);
   doc.text(`Horas: ${q.laborHours}`, 100, y);
-  doc.setFont(undefined, 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text(fmtCLPClient(q.laborTotal), pw - 25, y, { align: 'right' });
   y += 10;
 
@@ -1362,12 +1362,12 @@ function downloadQuotationPDF(recordId) {
     doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
     doc.setFontSize(11);
     doc.setTextColor(255);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text('Materiales', 25, y + 6);
     y += 14;
     doc.setFontSize(9);
     doc.setTextColor(120);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text('Material', 25, y);
     doc.text('Cant.', 105, y, { align: 'center' });
     doc.text('P. Unitario', 140, y, { align: 'right' });
@@ -1376,7 +1376,7 @@ function downloadQuotationPDF(recordId) {
     doc.setDrawColor(200);
     doc.line(25, y, pw - 25, y);
     y += 5;
-    doc.setFont(undefined, 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(60);
     mats.forEach((m, i) => {
       if (i % 2 === 0) { doc.setFillColor(249, 250, 251); doc.rect(22, y - 4, pw - 44, 7, 'F'); }
@@ -1396,7 +1396,7 @@ function downloadQuotationPDF(recordId) {
   y += 8;
   doc.setFontSize(10);
   doc.setTextColor(80);
-  doc.setFont(undefined, 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.text('Subtotal:', 25, y); doc.text(fmtCLPClient(q.subtotal), pw - 25, y, { align: 'right' }); y += 6;
   doc.text(`Comisión VOY (${Math.round(q.commissionRate * 100)}%):`, 25, y); doc.text(fmtCLPClient(q.commission), pw - 25, y, { align: 'right' }); y += 10;
 
@@ -1405,15 +1405,15 @@ function downloadQuotationPDF(recordId) {
   doc.roundedRect(20, y - 4, pw - 40, 14, 3, 3, 'F');
   doc.setFontSize(16);
   doc.setTextColor(255);
-  doc.setFont(undefined, 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text('TOTAL', 25, y + 6);
   doc.text(fmtCLPClient(q.grandTotal), pw - 25, y + 6, { align: 'right' });
   y += 20;
 
   if (q.notes) {
-    doc.setFontSize(10); doc.setTextColor(100); doc.setFont(undefined, 'bold');
+    doc.setFontSize(10); doc.setTextColor(100); doc.setFont('helvetica', 'bold');
     doc.text('Notas:', 20, y); y += 6;
-    doc.setFont(undefined, 'normal'); doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
     const lines = doc.splitTextToSize(q.notes, pw - 45);
     doc.text(lines, 25, y);
   }
@@ -1423,9 +1423,9 @@ function downloadQuotationPDF(recordId) {
   doc.rect(0, ph - 20, pw, 20, 'F');
   doc.setFontSize(8);
   doc.setTextColor(124, 58, 237);
-  doc.setFont(undefined, 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.text('VOY SpA', pw / 2, ph - 12, { align: 'center' });
-  doc.setFont(undefined, 'normal');
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(150);
   doc.text('Quinta Región, Chile · www.voy.cl · Documento generado automáticamente', pw / 2, ph - 6, { align: 'center' });
 
