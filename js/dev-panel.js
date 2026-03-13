@@ -181,6 +181,15 @@ const VOY_DEV = (() => {
         border-radius:8px; font-size:11px; font-family:inherit; cursor:pointer; outline:none; }
       .dev-task-counter { display:flex; gap:12px; padding:8px 16px; font-size:11px; color:#555; border-bottom:1px solid #1a1a2e; }
       .dev-task-counter span { display:flex; align-items:center; gap:4px; }
+      .dev-task-detail { padding:0 16px 10px 48px; overflow:hidden; max-height:0; opacity:0; transition:all 0.25s ease; }
+      .dev-task-detail.open { max-height:200px; opacity:1; padding-top:4px; }
+      .dev-task-detail textarea { width:100%; background:#1a1a30; border:1px solid #2a2a4a; color:#ccc; padding:8px 10px;
+        border-radius:8px; font-size:11px; font-family:inherit; outline:none; resize:vertical; min-height:50px; max-height:120px; transition:border 0.2s; }
+      .dev-task-detail textarea:focus { border-color:#8B5CF6; }
+      .dev-task-detail textarea::placeholder { color:#3a3a5a; }
+      .dev-task-detail-meta { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:10px; color:#444; }
+      .dev-task-chevron { color:#3a3a5a; font-size:10px; transition:transform 0.2s; cursor:pointer; padding:4px; }
+      .dev-task-chevron.open { transform:rotate(180deg); color:#8B5CF6; }
       .dev-task-empty { text-align:center; padding:32px 16px; color:#444; }
       .dev-task-empty i { font-size:28px; margin-bottom:8px; display:block; color:#3a3a5a; }
       @keyframes taskSlideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
@@ -669,17 +678,28 @@ const VOY_DEV = (() => {
       const assigneeLabel = { sergio: 'Sergio', guillermo: 'Guillermo', ambos: 'Ambos' }[assigneeClass] || 'Ambos';
       const statusClass = t.done ? 'realizado' : 'pendiente';
       const statusLabel = t.done ? 'Realizado' : 'Pendiente';
+      const created = t.createdAt ? new Date(t.createdAt).toLocaleDateString('es-CL', { day:'2-digit', month:'short' }) : '';
       return `
-        <div class="dev-task ${t.done ? 'done' : ''}" id="devTask-${t.id}">
-          <div class="dev-task-check ${t.done ? 'checked' : ''}" onclick="VOY_DEV.toggleTask('${t.id}')" title="${t.done ? 'Marcar pendiente' : 'Marcar realizado'}">
+        <div class="dev-task ${t.done ? 'done' : ''}" id="devTask-${t.id}" onclick="VOY_DEV.toggleTaskDetail('${t.id}')">
+          <div class="dev-task-check ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();VOY_DEV.toggleTask('${t.id}')" title="${t.done ? 'Marcar pendiente' : 'Marcar realizado'}">
             ${t.done ? '<i class="fa-solid fa-check"></i>' : ''}
           </div>
           <div class="dev-task-title">${escapeHtml(t.title)}</div>
           <span class="dev-task-status ${statusClass}">${statusLabel}</span>
-          <span class="dev-task-assignee ${assigneeClass}" onclick="VOY_DEV.cycleAssignee('${t.id}')" title="Click para cambiar">${assigneeLabel}</span>
-          <span class="dev-task-delete" onclick="VOY_DEV.deleteTask('${t.id}')" title="Eliminar">
+          <span class="dev-task-assignee ${assigneeClass}" onclick="event.stopPropagation();VOY_DEV.cycleAssignee('${t.id}')" title="Click para cambiar">${assigneeLabel}</span>
+          <i class="fa-solid fa-chevron-down dev-task-chevron" id="devTaskChevron-${t.id}"></i>
+          <span class="dev-task-delete" onclick="event.stopPropagation();VOY_DEV.deleteTask('${t.id}')" title="Eliminar">
             <i class="fa-solid fa-trash-can"></i>
           </span>
+        </div>
+        <div class="dev-task-detail" id="devTaskDetail-${t.id}">
+          <textarea placeholder="Escribe el detalle de esta tarea..." onclick="event.stopPropagation()"
+            onblur="VOY_DEV.saveTaskDetail('${t.id}', this.value)">${escapeHtml(t.detail || '')}</textarea>
+          <div class="dev-task-detail-meta">
+            <span><i class="fa-solid fa-calendar"></i> ${created}</span>
+            <span><i class="fa-solid fa-user"></i> ${assigneeLabel}</span>
+            ${t.done ? '<span style="color:#10B981;"><i class="fa-solid fa-check-circle"></i> Completada</span>' : ''}
+          </div>
         </div>`;
     }).join('');
   }
@@ -725,6 +745,26 @@ const VOY_DEV = (() => {
     renderTasks();
   }
 
+  function toggleTaskDetail(id) {
+    const detail = document.getElementById(`devTaskDetail-${id}`);
+    const chevron = document.getElementById(`devTaskChevron-${id}`);
+    if (!detail) return;
+    const isOpen = detail.classList.contains('open');
+    // Cerrar todos primero
+    document.querySelectorAll('.dev-task-detail.open').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.dev-task-chevron.open').forEach(c => c.classList.remove('open'));
+    if (!isOpen) {
+      detail.classList.add('open');
+      if (chevron) chevron.classList.add('open');
+    }
+  }
+
+  function saveTaskDetail(id, value) {
+    const tasks = loadTasks();
+    const task = tasks.find(t => t.id === id);
+    if (task) { task.detail = value; saveTasks(tasks); }
+  }
+
   function initTasks() {
     // Seed initial tasks if empty
     const tasks = loadTasks();
@@ -750,5 +790,5 @@ const VOY_DEV = (() => {
 
   return { togglePanel, close, goTo, clearCache, openRepo, switchTab, getEnv,
            toggleCommitDetail, manualMerge, toggleAutoMerge,
-           addTask, toggleTask, cycleAssignee, deleteTask };
+           addTask, toggleTask, cycleAssignee, deleteTask, toggleTaskDetail, saveTaskDetail };
 })();
