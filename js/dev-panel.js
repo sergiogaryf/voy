@@ -147,6 +147,44 @@ const VOY_DEV = (() => {
         border-radius:10px; font-weight:600; }
       .dev-auto-on { background:#10B98120; color:#10B981; }
       .dev-auto-off { background:#EF444420; color:#EF4444; }
+
+      /* Tasks tab */
+      .dev-task { padding:10px 16px; border-bottom:1px solid #1a1a2e; display:flex; align-items:center; gap:10px; transition:all 0.2s; }
+      .dev-task:hover { background:#1a1a30; }
+      .dev-task.done { opacity:0.5; }
+      .dev-task-check { width:22px; height:22px; border-radius:6px; border:2px solid #3a3a5a; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent; transition:all 0.2s; flex-shrink:0; }
+      .dev-task-check:hover { border-color:#8B5CF6; }
+      .dev-task-check.checked { background:#10B981; border-color:#10B981; color:white; }
+      .dev-task-title { flex:1; font-size:13px; color:#e0e0e0; line-height:1.3; }
+      .dev-task.done .dev-task-title { text-decoration:line-through; color:#555; }
+      .dev-task-assignee { padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+      .dev-task-assignee:hover { filter:brightness(1.3); }
+      .dev-task-assignee.sergio { background:#0EA5E920; color:#0EA5E9; border:1px solid #0EA5E940; }
+      .dev-task-assignee.guillermo { background:#10B98120; color:#10B981; border:1px solid #10B98140; }
+      .dev-task-assignee.ambos { background:#8B5CF620; color:#8B5CF6; border:1px solid #8B5CF640; }
+      .dev-task-delete { color:#3a3a5a; cursor:pointer; font-size:11px; transition:color 0.2s; padding:4px; }
+      .dev-task-delete:hover { color:#EF4444; }
+      .dev-task-status { font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px; }
+      .dev-task-status.pendiente { background:#F59E0B20; color:#F59E0B; }
+      .dev-task-status.realizado { background:#10B98120; color:#10B981; }
+      .dev-task-add-form { padding:12px 16px; display:flex; gap:8px; align-items:center; border-bottom:1px solid #2a2a4a; }
+      .dev-task-input { flex:1; background:#1a1a30; border:1px solid #2a2a4a; color:#e0e0e0; padding:8px 12px;
+        border-radius:8px; font-size:12px; font-family:inherit; outline:none; transition:border 0.2s; }
+      .dev-task-input:focus { border-color:#8B5CF6; }
+      .dev-task-input::placeholder { color:#444; }
+      .dev-task-add-btn { background:linear-gradient(135deg,#8B5CF6,#6D28D9); border:none; color:white;
+        width:34px; height:34px; border-radius:8px; cursor:pointer; font-size:14px; display:flex;
+        align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
+      .dev-task-add-btn:hover { transform:scale(1.05); box-shadow:0 4px 12px rgba(109,40,217,0.4); }
+      .dev-task-select { background:#1a1a30; border:1px solid #2a2a4a; color:#8B5CF6; padding:6px 8px;
+        border-radius:8px; font-size:11px; font-family:inherit; cursor:pointer; outline:none; }
+      .dev-task-counter { display:flex; gap:12px; padding:8px 16px; font-size:11px; color:#555; border-bottom:1px solid #1a1a2e; }
+      .dev-task-counter span { display:flex; align-items:center; gap:4px; }
+      .dev-task-empty { text-align:center; padding:32px 16px; color:#444; }
+      .dev-task-empty i { font-size:28px; margin-bottom:8px; display:block; color:#3a3a5a; }
+      @keyframes taskSlideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
+      .dev-task { animation: taskSlideIn 0.25s ease; }
       @keyframes spin { to { transform:rotate(360deg); } }
       #devPanel::-webkit-scrollbar, .dev-tab-content::-webkit-scrollbar { width:4px; }
       #devPanel::-webkit-scrollbar-thumb, .dev-tab-content::-webkit-scrollbar-thumb { background:#2a2a4a; border-radius:4px; }
@@ -197,6 +235,9 @@ const VOY_DEV = (() => {
         </div>
         <div class="dev-tab" onclick="VOY_DEV.switchTab('deploys')">
           <i class="fa-solid fa-rocket"></i> Deploys
+        </div>
+        <div class="dev-tab" onclick="VOY_DEV.switchTab('tasks')">
+          <i class="fa-solid fa-list-check"></i> Tareas
         </div>
         <div class="dev-tab" onclick="VOY_DEV.switchTab('tools')">
           <i class="fa-solid fa-wrench"></i> Tools
@@ -281,6 +322,23 @@ const VOY_DEV = (() => {
           <div class="dev-stat-card"><div class="dev-stat-val">—</div><div class="dev-stat-label">Clientes</div></div>
           <div class="dev-stat-card"><div class="dev-stat-val">—</div><div class="dev-stat-label">Bookings</div></div>
         </div>
+      </div>
+
+      <!-- Tab: Tasks -->
+      <div class="dev-tab-content" id="devTab-tasks">
+        <div class="dev-task-add-form">
+          <input type="text" class="dev-task-input" id="devTaskInput" placeholder="Nueva tarea..." onkeydown="if(event.key==='Enter')VOY_DEV.addTask()">
+          <select class="dev-task-select" id="devTaskAssignee">
+            <option value="ambos">Ambos</option>
+            <option value="sergio">Sergio</option>
+            <option value="guillermo">Guillermo</option>
+          </select>
+          <button class="dev-task-add-btn" onclick="VOY_DEV.addTask()" title="Agregar tarea">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+        <div class="dev-task-counter" id="devTaskCounter"></div>
+        <div id="devTaskList"></div>
       </div>
 
       <!-- Tab: Tools -->
@@ -569,13 +627,128 @@ const VOY_DEV = (() => {
     document.getElementById(`devTab-${name}`)?.classList.add('active');
   }
 
+  /* ── Tasks / Tareas ──────────────────────── */
+  const TASKS_KEY = 'voy_dev_tasks';
+
+  function loadTasks() {
+    try { return JSON.parse(localStorage.getItem(TASKS_KEY) || '[]'); } catch { return []; }
+  }
+
+  function saveTasks(tasks) {
+    localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+  }
+
+  function renderTasks() {
+    const el = document.getElementById('devTaskList');
+    const counter = document.getElementById('devTaskCounter');
+    if (!el) return;
+    const tasks = loadTasks();
+
+    if (counter) {
+      const pending = tasks.filter(t => !t.done).length;
+      const done = tasks.filter(t => t.done).length;
+      counter.innerHTML = `
+        <span><i class="fa-solid fa-clock" style="color:#F59E0B;"></i> ${pending} pendiente${pending !== 1 ? 's' : ''}</span>
+        <span><i class="fa-solid fa-check-circle" style="color:#10B981;"></i> ${done} realizada${done !== 1 ? 's' : ''}</span>
+        <span style="margin-left:auto;"><i class="fa-solid fa-list"></i> ${tasks.length} total</span>`;
+    }
+
+    if (!tasks.length) {
+      el.innerHTML = `<div class="dev-task-empty">
+        <i class="fa-solid fa-clipboard-list"></i>
+        <div style="font-size:13px;font-weight:600;">Sin tareas</div>
+        <div style="font-size:11px;margin-top:4px;">Agrega una tarea arriba para comenzar</div>
+      </div>`;
+      return;
+    }
+
+    // Pendientes primero, luego realizadas
+    const sorted = [...tasks].sort((a, b) => a.done - b.done || b.createdAt - a.createdAt);
+    el.innerHTML = sorted.map(t => {
+      const assigneeClass = t.assignee || 'ambos';
+      const assigneeLabel = { sergio: 'Sergio', guillermo: 'Guillermo', ambos: 'Ambos' }[assigneeClass] || 'Ambos';
+      const statusClass = t.done ? 'realizado' : 'pendiente';
+      const statusLabel = t.done ? 'Realizado' : 'Pendiente';
+      return `
+        <div class="dev-task ${t.done ? 'done' : ''}" id="devTask-${t.id}">
+          <div class="dev-task-check ${t.done ? 'checked' : ''}" onclick="VOY_DEV.toggleTask('${t.id}')" title="${t.done ? 'Marcar pendiente' : 'Marcar realizado'}">
+            ${t.done ? '<i class="fa-solid fa-check"></i>' : ''}
+          </div>
+          <div class="dev-task-title">${escapeHtml(t.title)}</div>
+          <span class="dev-task-status ${statusClass}">${statusLabel}</span>
+          <span class="dev-task-assignee ${assigneeClass}" onclick="VOY_DEV.cycleAssignee('${t.id}')" title="Click para cambiar">${assigneeLabel}</span>
+          <span class="dev-task-delete" onclick="VOY_DEV.deleteTask('${t.id}')" title="Eliminar">
+            <i class="fa-solid fa-trash-can"></i>
+          </span>
+        </div>`;
+    }).join('');
+  }
+
+  function addTask() {
+    const input = document.getElementById('devTaskInput');
+    const assignee = document.getElementById('devTaskAssignee');
+    if (!input || !input.value.trim()) return;
+
+    const tasks = loadTasks();
+    tasks.push({
+      id: 'task-' + Date.now(),
+      title: input.value.trim(),
+      assignee: assignee?.value || 'ambos',
+      done: false,
+      createdAt: Date.now(),
+    });
+    saveTasks(tasks);
+    input.value = '';
+    renderTasks();
+  }
+
+  function toggleTask(id) {
+    const tasks = loadTasks();
+    const task = tasks.find(t => t.id === id);
+    if (task) { task.done = !task.done; saveTasks(tasks); renderTasks(); }
+  }
+
+  function cycleAssignee(id) {
+    const tasks = loadTasks();
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const cycle = ['sergio', 'guillermo', 'ambos'];
+    const idx = cycle.indexOf(task.assignee);
+    task.assignee = cycle[(idx + 1) % cycle.length];
+    saveTasks(tasks);
+    renderTasks();
+  }
+
+  function deleteTask(id) {
+    const tasks = loadTasks().filter(t => t.id !== id);
+    saveTasks(tasks);
+    renderTasks();
+  }
+
+  function initTasks() {
+    // Seed initial tasks if empty
+    const tasks = loadTasks();
+    if (!tasks.length) {
+      const defaultTasks = [
+        { id: 'task-1', title: 'Fix PDF descarga en panel cliente', assignee: 'guillermo', done: false, createdAt: Date.now() },
+        { id: 'task-2', title: 'Mejorar visual cotizaciones en worker', assignee: 'guillermo', done: true, createdAt: Date.now() - 1000 },
+        { id: 'task-3', title: 'Traer mejoras visuales de Sergio a fusión', assignee: 'sergio', done: false, createdAt: Date.now() - 2000 },
+        { id: 'task-4', title: 'Agregar notificaciones push', assignee: 'ambos', done: false, createdAt: Date.now() - 3000 },
+      ];
+      saveTasks(defaultTasks);
+    }
+    renderTasks();
+  }
+
   // Auto-init
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => { init(); initTasks(); });
   } else {
     init();
+    initTasks();
   }
 
   return { togglePanel, close, goTo, clearCache, openRepo, switchTab, getEnv,
-           toggleCommitDetail, manualMerge, toggleAutoMerge };
+           toggleCommitDetail, manualMerge, toggleAutoMerge,
+           addTask, toggleTask, cycleAssignee, deleteTask };
 })();
