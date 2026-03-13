@@ -139,7 +139,7 @@ function loadActiveJobCard() {
         <i class="fa-solid fa-comment-dots"></i> Chat
       </button>
       <button class="btn btn-success flex-1" onclick="completeJob('${active._recordId}')">
-        <i class="fa-solid fa-check"></i> Completar
+        <i class="fa-solid fa-check"></i> Completar <span class="badge-new">NUEVO</span>
       </button>
     </div>`;
 }
@@ -148,7 +148,27 @@ async function completeJob(recordId) {
   const btn = event?.currentTarget;
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
   try {
+    const booking = VOY_DATA.bookings.find(b => b._recordId === recordId);
+    const client = VOY_DATA.clients.find(c => c.id === booking?.clientId);
+
     await VoyDB.updateBookingStatus(recordId, 'completed');
+
+    // Crear transacción
+    if (booking) {
+      await VoyDB.createTransaction({
+        clientName: client?.name || 'Cliente',
+        workerName: workerData?.name || 'Profesional',
+        service: booking.service,
+        gross: booking.price,
+      });
+    }
+
+    // Email admin: trabajo completado
+    sendVoyEmail(client?.email || '', 'admin_job_completed', {
+      workerName: workerData?.name, clientName: client?.name,
+      service: booking?.service, price: booking?.price,
+    });
+
     VOY_DATA.bookings = await VoyDB.getBookings();
     VOY.showToast('¡Trabajo marcado como completado!', 'success');
     loadWorkerDashboard();
@@ -273,6 +293,9 @@ function buildRequestCard(r) {
       <button class="btn btn-outline btn-sm flex-1" onclick="openWorkerChat(${r.clientId || 0}, '${(r.clientName || 'Cliente').replace(/'/g, "\\'")}')">
         <i class="fa-solid fa-comment-dots"></i> Preguntar
       </button>
+      <button class="btn btn-outline btn-sm flex-1" style="color:#4f46e5;border-color:#4f46e5;" onclick="openQuotationModal('${r._recordId}')">
+        <i class="fa-solid fa-file-invoice-dollar"></i> Cotizar <span class="badge-new">NUEVO</span>
+      </button>
       <button class="btn btn-success btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'accepted')">
         <i class="fa-solid fa-check"></i> Aceptar
       </button>
@@ -294,6 +317,10 @@ async function handleRequest(recordId, action) {
     const idx = workerRequests.findIndex(r => r._recordId === recordId);
     if (idx !== -1) { workerRequests[idx].status = action; workerRequests[idx].isNew = false; }
 
+    // Datos para email admin
+    const reqData = workerRequests.find(r => r._recordId === recordId);
+    const clientForEmail = VOY_DATA.clients.find(c => c.id === reqData?.clientId);
+
     if (action === 'accepted') {
       VOY.showToast(`✅ Solicitud aceptada`, 'success');
       // Actualizar el booking correspondiente a 'active'
@@ -301,8 +328,20 @@ async function handleRequest(recordId, action) {
         workerRequests.find(r => r._recordId === recordId)?.service === b.service
       );
       if (matchBooking?._recordId) await VoyDB.updateBookingStatus(matchBooking._recordId, 'active');
+
+      // Email admin: solicitud aceptada
+      sendVoyEmail(clientForEmail?.email || '', 'admin_request_accepted', {
+        workerName: workerData?.name, clientName: reqData?.clientName,
+        service: reqData?.service, price: reqData?.estimatedPrice,
+      });
     } else {
       VOY.showToast('Solicitud rechazada', 'info');
+
+      // Email admin: solicitud rechazada
+      sendVoyEmail(clientForEmail?.email || '', 'admin_request_rejected', {
+        workerName: workerData?.name, clientName: reqData?.clientName,
+        service: reqData?.service,
+      });
     }
 
     // Actualizar badge
@@ -925,6 +964,264 @@ function handleWorkerChatKey(e) {
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => { if (e.target === overlay) VOY.closeModal(overlay.id); });
 });
+
+/* ── Email helper ─────────────────────────── */
+function sendVoyEmail(to, template, extra = {}) {
+  if (!to) return;
+  fetch('/api/send-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, template, baseUrl: VOY_SITE_URL, ...extra }),
+  }).catch(e => console.warn('Email send failed:', e));
+}
+
+/* ── Quotation Modal ─────────────────────── */
+let quotationRequestId = null;
+let quotationMaterials = [{ name: '', qty: 1, unitPrice: 0 }];
+
+function openQuotationModal(requestRecordId) {
+  quotationRequestId = requestRecordId;
+  const req = workerRequests.find(r => r._recordId === requestRecordId);
+  if (!req) return;
+
+  const client = VOY_DATA.clients.find(c => c.id === req.clientId);
+  const commRate = workerData?.verified ? 0.12 : 0.15;
+
+  document.getElementById('qClientName').textContent = req.clientName || 'Cliente';
+  document.getElementById('qService').textContent = req.service || '-';
+  document.getElementById('qClientEmail').textContent = client?.email || '-';
+  document.getElementById('qCommLabel').textContent = `Comisión VOY (${Math.round(commRate * 100)}%)`;
+  document.getElementById('qLaborRate').value = workerData?.priceMin || 15000;
+  document.getElementById('qLaborHours').value = 1;
+  document.getElementById('qNotes').value = '';
+
+  quotationMaterials = [{ name: '', qty: 1, unitPrice: 0 }];
+  renderMaterialRows();
+  recalcQuotation();
+  VOY.openModal('quotationModal');
+}
+
+function renderMaterialRows() {
+  const el = document.getElementById('qMaterialsBody');
+  if (!el) return;
+  el.innerHTML = quotationMaterials.map((m, i) => `
+    <tr>
+      <td><input class="input" style="font-size:13px;padding:6px;" value="${m.name}" onchange="quotationMaterials[${i}].name=this.value" /></td>
+      <td><input class="input" type="number" min="1" style="width:60px;font-size:13px;padding:6px;" value="${m.qty}" onchange="quotationMaterials[${i}].qty=Number(this.value);recalcQuotation()" /></td>
+      <td><input class="input" type="number" min="0" style="width:100px;font-size:13px;padding:6px;" value="${m.unitPrice}" onchange="quotationMaterials[${i}].unitPrice=Number(this.value);recalcQuotation()" /></td>
+      <td style="font-weight:600;text-align:right;">${VOY.formatCLP(m.qty * m.unitPrice)}</td>
+      <td><button class="btn btn-ghost btn-sm" style="color:var(--color-danger);padding:2px 6px;" onclick="removeMaterialRow(${i})"><i class="fa-solid fa-trash"></i></button></td>
+    </tr>`).join('');
+}
+
+function addMaterialRow() {
+  quotationMaterials.push({ name: '', qty: 1, unitPrice: 0 });
+  renderMaterialRows();
+}
+
+function removeMaterialRow(idx) {
+  quotationMaterials.splice(idx, 1);
+  if (!quotationMaterials.length) quotationMaterials.push({ name: '', qty: 1, unitPrice: 0 });
+  renderMaterialRows();
+  recalcQuotation();
+}
+
+function recalcQuotation() {
+  const rate = Number(document.getElementById('qLaborRate')?.value) || 0;
+  const hours = Number(document.getElementById('qLaborHours')?.value) || 0;
+  const laborTotal = rate * hours;
+  const materialsTotal = quotationMaterials.reduce((s, m) => s + (m.qty * m.unitPrice), 0);
+  const subtotal = laborTotal + materialsTotal;
+  const commRate = workerData?.verified ? 0.12 : 0.15;
+  const commission = Math.round(subtotal * commRate);
+  const grandTotal = subtotal + commission;
+
+  document.getElementById('qLaborTotal').textContent = VOY.formatCLP(laborTotal);
+  document.getElementById('qMaterialsTotal').textContent = VOY.formatCLP(materialsTotal);
+  document.getElementById('qSubtotal').textContent = VOY.formatCLP(subtotal);
+  document.getElementById('qCommission').textContent = VOY.formatCLP(commission);
+  document.getElementById('qGrandTotal').textContent = VOY.formatCLP(grandTotal);
+}
+
+async function submitQuotation() {
+  const req = workerRequests.find(r => r._recordId === quotationRequestId);
+  if (!req) return;
+
+  const rate = Number(document.getElementById('qLaborRate')?.value) || 0;
+  const hours = Number(document.getElementById('qLaborHours')?.value) || 0;
+  if (rate <= 0 || hours <= 0) { VOY.showToast('Ingresa tarifa y horas', 'error'); return; }
+
+  const laborTotal = rate * hours;
+  const validMaterials = quotationMaterials.filter(m => m.name.trim());
+  const materialsTotal = validMaterials.reduce((s, m) => s + (m.qty * m.unitPrice), 0);
+  const subtotal = laborTotal + materialsTotal;
+  const commRate = workerData?.verified ? 0.12 : 0.15;
+  const commission = Math.round(subtotal * commRate);
+  const grandTotal = subtotal + commission;
+  const notes = document.getElementById('qNotes')?.value || '';
+
+  const client = VOY_DATA.clients.find(c => c.id === req.clientId);
+  const matchBooking = VOY_DATA.bookings.find(b => req.service === b.service && b.clientId === req.clientId);
+
+  const btn = document.querySelector('#quotationModal .btn-primary');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; }
+
+  try {
+    const quote = await VoyDB.createQuotation({
+      bookingRecordId: matchBooking?._recordId || '',
+      workerRecordId: workerData?._recordId || '',
+      clientId: req.clientId,
+      workerName: workerData?.name || '',
+      clientName: req.clientName || '',
+      clientEmail: client?.email || '',
+      service: req.service,
+      laborRate: rate,
+      laborHours: hours,
+      laborTotal,
+      materials: validMaterials,
+      materialsTotal,
+      subtotal,
+      commissionRate: commRate,
+      commission,
+      grandTotal,
+      notes,
+    });
+
+    // Email al cliente + admins
+    sendVoyEmail(client?.email || '', 'new_quotation', {
+      workerName: workerData?.name, clientName: req.clientName,
+      service: req.service, laborTotal, materialsTotal, subtotal, commission, grandTotal,
+      quoteId: quote.quoteId,
+    });
+
+    // Generar PDF
+    try { generateVoyPDF(quote); } catch(e) { console.warn('PDF generation failed:', e); }
+
+    VOY.closeModal('quotationModal');
+    VOY.showToast('Cotización enviada exitosamente', 'success');
+  } catch (e) {
+    console.error(e);
+    VOY.showToast('Error al enviar cotización', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar cotización'; }
+  }
+}
+
+/* ── PDF Generation (jsPDF) ──────────────── */
+function generateVoyPDF(data) {
+  if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
+    VOY.showToast('jsPDF no disponible', 'error');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pw = doc.internal.pageSize.getWidth();
+  let y = 20;
+
+  // Header
+  doc.setFontSize(28);
+  doc.setTextColor(37, 99, 235);
+  doc.text('VOY', 20, y);
+  doc.setFontSize(14);
+  doc.setTextColor(100);
+  doc.text('Cotización de Servicio', pw - 20, y, { align: 'right' });
+  y += 10;
+  doc.setFontSize(10);
+  doc.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, pw - 20, y, { align: 'right' });
+  y += 5;
+  doc.text(`Ref: ${data.quoteId}`, pw - 20, y, { align: 'right' });
+  y += 12;
+
+  // Línea divisoria
+  doc.setDrawColor(200);
+  doc.line(20, y, pw - 20, y);
+  y += 10;
+
+  // Datos
+  doc.setFontSize(11);
+  doc.setTextColor(50);
+  doc.text(`Especialista: ${data.workerName}`, 20, y);
+  doc.text(`Cliente: ${data.clientName}`, pw / 2, y);
+  y += 6;
+  doc.text(`Servicio: ${data.service}`, 20, y);
+  doc.text(`Email: ${data.clientEmail}`, pw / 2, y);
+  y += 12;
+
+  // Mano de obra
+  doc.setFontSize(12);
+  doc.setTextColor(37, 99, 235);
+  doc.text('Mano de Obra', 20, y);
+  y += 8;
+  doc.setFontSize(10);
+  doc.setTextColor(80);
+  doc.text(`Tarifa/hora: ${fmtCLP(data.laborRate)}  x  ${data.laborHours} horas  =  ${fmtCLP(data.laborTotal)}`, 25, y);
+  y += 10;
+
+  // Materiales
+  const materials = data.materials || [];
+  if (materials.length) {
+    doc.setFontSize(12);
+    doc.setTextColor(37, 99, 235);
+    doc.text('Materiales', 20, y);
+    y += 8;
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text('Material', 25, y);
+    doc.text('Cant.', 100, y);
+    doc.text('P. Unit.', 120, y);
+    doc.text('Total', 155, y);
+    y += 5;
+    doc.setDrawColor(220);
+    doc.line(25, y, 175, y);
+    y += 5;
+    doc.setTextColor(60);
+    materials.forEach(m => {
+      doc.text(m.name || '-', 25, y);
+      doc.text(String(m.qty), 105, y);
+      doc.text(fmtCLP(m.unitPrice), 120, y);
+      doc.text(fmtCLP(m.qty * m.unitPrice), 155, y);
+      y += 6;
+    });
+    y += 4;
+  }
+
+  // Resumen
+  doc.setDrawColor(200);
+  doc.line(20, y, pw - 20, y);
+  y += 8;
+  doc.setFontSize(11);
+  doc.setTextColor(80);
+  doc.text(`Subtotal mano de obra:`, 25, y); doc.text(fmtCLP(data.laborTotal), 155, y); y += 6;
+  doc.text(`Subtotal materiales:`, 25, y); doc.text(fmtCLP(data.materialsTotal), 155, y); y += 6;
+  doc.text(`Comisión VOY (${Math.round(data.commissionRate * 100)}%):`, 25, y); doc.text(fmtCLP(data.commission), 155, y); y += 8;
+  doc.setFontSize(14);
+  doc.setTextColor(37, 99, 235);
+  doc.text('TOTAL:', 25, y); doc.text(fmtCLP(data.grandTotal), 155, y); y += 10;
+
+  // Notas
+  if (data.notes) {
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('Notas:', 20, y); y += 6;
+    doc.setFontSize(9);
+    const lines = doc.splitTextToSize(data.notes, pw - 45);
+    doc.text(lines, 25, y);
+    y += lines.length * 5 + 5;
+  }
+
+  // Footer
+  y = doc.internal.pageSize.getHeight() - 15;
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.text('VOY SpA — Quinta Región, Chile', pw / 2, y, { align: 'center' });
+
+  doc.save(`Cotizacion_${data.quoteId}.pdf`);
+}
+
+function fmtCLP(n) {
+  if (!n && n !== 0) return '-';
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(n);
+}
 
 /* ── Logout ─────────────────────────────── */
 function logout() {

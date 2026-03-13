@@ -42,6 +42,11 @@ const VOY_DATA = {
   },
 };
 
+/* ── Site URL helper (multi-deployment) ──── */
+const VOY_SITE_URL = (typeof VOY_BUILD !== 'undefined' && VOY_BUILD.url && VOY_BUILD.url !== 'localhost')
+  ? 'https://' + VOY_BUILD.url
+  : '';
+
 /* ── Helpers (sin cambios) ───────────────── */
 const VOY = {
   formatCLP(amount) {

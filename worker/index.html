@@ -35,6 +35,8 @@
     .step-icon.done { background:#d1fae5; color:#059669; }
     .step-icon.pending { background:#fef3c7; color:#d97706; }
     .step-icon.missing { background:#fee2e2; color:#dc2626; }
+    .badge-new { display:inline-block; padding:1px 6px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:white; font-size:9px; font-weight:800; border-radius:var(--radius-full); letter-spacing:0.5px; vertical-align:middle; margin-left:4px; animation:pulseNew 2s infinite; }
+    @keyframes pulseNew { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
   </style>
 </head>
 <body>
@@ -350,7 +352,71 @@
   </div>
 </div>
 
+<!-- Quotation Modal -->
+<div class="modal-overlay" id="quotationModal">
+  <div class="modal" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-header" style="flex-shrink:0;">
+      <h3 style="font-weight:700;color:var(--gray-900);"><i class="fa-solid fa-file-invoice-dollar" style="color:#4f46e5;"></i> Crear Cotización <span class="badge-new">NUEVO</span></h3>
+      <button class="modal-close" onclick="VOY.closeModal('quotationModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto;">
+      <!-- Client info -->
+      <div style="display:flex;gap:var(--sp-4);padding:var(--sp-3);background:var(--gray-50);border-radius:var(--radius-xl);margin-bottom:var(--sp-4);">
+        <div style="flex:1;"><strong>Cliente:</strong> <span id="qClientName">-</span></div>
+        <div style="flex:1;"><strong>Servicio:</strong> <span id="qService">-</span></div>
+        <div style="flex:1;font-size:var(--text-xs);color:var(--gray-400);"><span id="qClientEmail">-</span></div>
+      </div>
+
+      <!-- Labor -->
+      <h4 style="font-size:var(--text-sm);font-weight:700;color:var(--gray-700);margin-bottom:var(--sp-2);">Mano de obra</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-3);margin-bottom:var(--sp-4);">
+        <div class="input-group">
+          <label class="input-label">Tarifa/hora (CLP)</label>
+          <input class="input" type="number" id="qLaborRate" min="0" value="15000" oninput="recalcQuotation()" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Horas estimadas</label>
+          <input class="input" type="number" id="qLaborHours" min="0.5" step="0.5" value="1" oninput="recalcQuotation()" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Total mano de obra</label>
+          <div id="qLaborTotal" style="font-weight:700;color:var(--color-primary);padding:var(--sp-3);background:var(--blue-50);border-radius:var(--radius-lg);text-align:center;">$0</div>
+        </div>
+      </div>
+
+      <!-- Materials -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-2);">
+        <h4 style="font-size:var(--text-sm);font-weight:700;color:var(--gray-700);">Materiales</h4>
+        <button class="btn btn-ghost btn-sm" onclick="addMaterialRow()" style="color:#4f46e5;"><i class="fa-solid fa-plus"></i> Agregar</button>
+      </div>
+      <table style="width:100%;font-size:var(--text-sm);margin-bottom:var(--sp-4);">
+        <thead><tr style="color:var(--gray-400);font-size:var(--text-xs);"><th style="text-align:left;">Material</th><th style="width:60px;">Cant.</th><th style="width:100px;">P. Unitario</th><th style="width:80px;text-align:right;">Total</th><th style="width:30px;"></th></tr></thead>
+        <tbody id="qMaterialsBody"></tbody>
+      </table>
+
+      <!-- Summary -->
+      <div style="background:#f5f3ff;border-radius:var(--radius-xl);padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2);">
+        <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);"><span>Subtotal materiales</span><span id="qMaterialsTotal" style="font-weight:600;">$0</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);"><span>Subtotal general</span><span id="qSubtotal" style="font-weight:600;">$0</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);color:var(--gray-500);"><span id="qCommLabel">Comisión VOY (15%)</span><span id="qCommission">$0</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:var(--text-lg);font-weight:800;color:#4f46e5;border-top:1px solid #c4b5fd;padding-top:var(--sp-2);"><span>TOTAL</span><span id="qGrandTotal">$0</span></div>
+      </div>
+
+      <!-- Notes -->
+      <div class="input-group" style="margin-top:var(--sp-4);">
+        <label class="input-label">Notas para el cliente</label>
+        <textarea class="input" id="qNotes" rows="2" placeholder="Observaciones, tiempos de entrega, condiciones..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-shrink:0;">
+      <button class="btn btn-ghost" onclick="VOY.closeModal('quotationModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitQuotation()"><i class="fa-solid fa-paper-plane"></i> Enviar cotización <span class="badge-new" style="background:rgba(255,255,255,0.3);color:white;">NUEVO</span></button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/airtable.js"></script>
 <script src="../js/auth.js"></script>

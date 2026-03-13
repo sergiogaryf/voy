@@ -436,6 +436,16 @@
     setLoading('btnRegister', true);
     try {
       const session = await VoyAuth.register({ name, email, phone, city, category, password, role });
+
+      // Enviar email de bienvenida
+      const siteUrl = (typeof VOY_BUILD !== 'undefined' && VOY_BUILD.url && VOY_BUILD.url !== 'localhost')
+        ? 'https://' + VOY_BUILD.url : '';
+      fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: email, template: 'welcome', name, baseUrl: siteUrl }),
+      }).catch(() => {});
+
       const routes  = { cliente: '/client/', profesional: '/worker/' };
       window.location.href = routes[session.role] || '/';
     } catch (e) {
