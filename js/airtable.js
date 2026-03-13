@@ -143,6 +143,33 @@ const VoyDB = (() => {
     };
   }
 
+  function mapQuotation(rec) {
+    const f = rec.fields;
+    return {
+      _recordId:       rec.id,
+      quoteId:         f.QuoteId          || '',
+      bookingRecordId: f.BookingRecordId  || '',
+      workerRecordId:  f.WorkerRecordId   || '',
+      clientId:        f.ClientId         || 0,
+      workerName:      f.WorkerName       || '',
+      clientName:      f.ClientName       || '',
+      clientEmail:     f.ClientEmail      || '',
+      service:         f.Service          || '',
+      status:          f.Status           || 'pending',
+      laborRate:       f.LaborRate        || 0,
+      laborHours:      f.LaborHours       || 0,
+      laborTotal:      f.LaborTotal       || 0,
+      materials:       f.Materials        ? JSON.parse(f.Materials) : [],
+      materialsTotal:  f.MaterialsTotal   || 0,
+      subtotal:        f.Subtotal         || 0,
+      commissionRate:  f.CommissionRate   || 0.15,
+      commission:      f.Commission       || 0,
+      grandTotal:      f.GrandTotal       || 0,
+      notes:           f.Notes            || '',
+      createdAt:       f.CreatedAt        || '',
+    };
+  }
+
   function mapTransaction(rec) {
     const f = rec.fields;
     return {
@@ -559,33 +586,29 @@ const VoyDB = (() => {
 
   /* ── Upload de avatar ────────────────────── */
   async function uploadAvatar(table, recordId, avatarFieldId, file) {
-    // Convertir archivo a base64
-    const fileBase64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    // Usar API serverless para evitar CORS
-    const res = await fetch('/api/upload', {
+    const url = `https://content.airtable.com/v0/${baseId()}/${recordId}/${avatarFieldId}/uploadAttachment`;
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    formData.append('filename', file.name);
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        table,
-        recordId,
-        fieldId: avatarFieldId,
-        fileName: file.name,
-        fileBase64,
-      }),
+      headers: { Authorization: `Bearer ${token()}` },
+      body: formData,
     });
-
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`Avatar upload failed: ${err?.error || err?.detail || res.statusText}`);
+      throw new Error(`Avatar upload failed: ${err?.error?.message || res.statusText}`);
     }
     const data = await res.json();
-    return data.url;
+    const attachmentUrl = data.attachments?.[0]?.thumbnails?.large?.url || data.attachments?.[0]?.url;
+    // Guardar también en campo Avatar (URL) para referencia rápida
+    if (attachmentUrl) {
+      await request(`${table}/${recordId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ fields: { Avatar: attachmentUrl } }),
+      });
+    }
+    return attachmentUrl;
   }
 
   /* ── Suspender usuarios ──────────────────── */
@@ -596,9 +619,63 @@ const VoyDB = (() => {
     });
   }
 
-  /* ── Eliminar registro ──────────────────── */
-  async function deleteRecord(table, recordId) {
-    return request(`${table}/${recordId}`, { method: 'DELETE' });
+  /* ── Quotations ─────────────────────────── */
+  async function createQuotation(data) {
+    const quoteId = 'QUO-' + String(Date.now()).slice(-6);
+    const rec = await request('Quotations', {
+      method: 'POST',
+      body: JSON.stringify({
+        fields: {
+          QuoteId:         quoteId,
+          BookingRecordId: data.bookingRecordId  || '',
+          WorkerRecordId:  data.workerRecordId   || '',
+          ClientId:        data.clientId          || 0,
+          WorkerName:      data.workerName        || '',
+          ClientName:      data.clientName        || '',
+          ClientEmail:     data.clientEmail       || '',
+          Service:         data.service           || '',
+          Status:          'pending',
+          LaborRate:       data.laborRate         || 0,
+          LaborHours:      data.laborHours        || 0,
+          LaborTotal:      data.laborTotal        || 0,
+          Materials:       JSON.stringify(data.materials || []),
+          MaterialsTotal:  data.materialsTotal    || 0,
+          Subtotal:        data.subtotal          || 0,
+          CommissionRate:  data.commissionRate     || 0.15,
+          Commission:      data.commission        || 0,
+          GrandTotal:      data.grandTotal        || 0,
+          Notes:           data.notes             || '',
+          CreatedAt:       new Date().toISOString(),
+        },
+      }),
+    });
+    return mapQuotation(rec);
+  }
+
+  async function getQuotationsByWorker(workerRecordId) {
+    const formula = `{WorkerRecordId}="${workerRecordId}"`;
+    const records = await listAll('Quotations', `filterByFormula=${encodeURIComponent(formula)}`);
+    return records.map(mapQuotation);
+  }
+
+  async function getQuotationsByClient(clientId) {
+    const formula = `{ClientId}=${clientId}`;
+    const records = await listAll('Quotations', `filterByFormula=${encodeURIComponent(formula)}`);
+    return records.map(mapQuotation);
+  }
+
+  async function getQuotationByBooking(bookingRecordId) {
+    const formula = `{BookingRecordId}="${bookingRecordId}"`;
+    const records = await listAll('Quotations', `filterByFormula=${encodeURIComponent(formula)}`);
+    return records.length ? mapQuotation(records[0]) : null;
+  }
+
+  async function updateQuotationStatus(recordId, status) {
+    const rec = await request(`Quotations/${recordId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: { Status: status } }),
+    });
+    return mapQuotation(rec);
   }
 
   /* ── Exports públicos ────────────────────── */
@@ -629,9 +706,10 @@ const VoyDB = (() => {
     uploadAvatar,
     // User status
     updateUserStatus,
-    // Delete
-    deleteRecord,
     // Favoritos
     getFavorites, saveFavorites, toggleFavoriteLocal,
+    // Quotations
+    createQuotation, getQuotationsByWorker, getQuotationsByClient,
+    getQuotationByBooking, updateQuotationStatus,
   };
 })();

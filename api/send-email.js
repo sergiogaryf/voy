@@ -1,241 +1,236 @@
 /* ============================================
-   VOY — API: Envío de emails
-   Usa Resend SDK — gratis 100 emails/día
-   Env var requerida: VOY_RESEND_KEY
+   VOY — API de Envío de Emails (Vercel Serverless)
+   Soporta múltiples templates + notificaciones admin
    ============================================ */
 
-const { Resend } = require('resend');
-
-/* ── Layout base para todos los emails ─── */
-function emailLayout(content, accentColor) {
-  return `
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Inter','Helvetica Neue',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-
-  <!-- Header con logo -->
-  <tr>
-    <td style="padding:32px 40px 24px;border-bottom:3px solid ${accentColor};">
-      <table width="100%"><tr>
-        <td>
-          <div style="display:inline-block;background:${accentColor};color:white;font-size:28px;font-weight:900;padding:8px 20px;border-radius:10px;letter-spacing:2px;">VOY</div>
-        </td>
-        <td align="right" style="font-size:12px;color:#9ca3af;">
-          Quinta Región, Chile
-        </td>
-      </tr></table>
-    </td>
-  </tr>
-
-  <!-- Contenido -->
-  <tr>
-    <td style="padding:32px 40px;">
-      ${content}
-    </td>
-  </tr>
-
-  <!-- Despedida -->
-  <tr>
-    <td style="padding:0 40px 32px;">
-      <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">
-        Atento,<br>
-        <strong style="color:#111827;">Equipo Soporte VOY</strong>
-      </p>
-    </td>
-  </tr>
-
-  <!-- Footer -->
-  <tr>
-    <td style="background:#111827;padding:24px 40px;border-radius:0 0 16px 16px;">
-      <table width="100%"><tr>
-        <td>
-          <div style="display:inline-block;background:${accentColor};color:white;font-size:16px;font-weight:900;padding:4px 12px;border-radius:6px;letter-spacing:1px;">VOY</div>
-          <span style="color:#9ca3af;font-size:12px;margin-left:12px;">Servicios a un VOY de distancia</span>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding-top:12px;">
-          <span style="color:#6b7280;font-size:11px;">© 2026 VOY SpA · Quinta Región, Chile</span>
-          <span style="float:right;">
-            <a href="https://voy-app-2.vercel.app" style="color:${accentColor};font-size:11px;text-decoration:none;">voy-app.cl</a>
-          </span>
-        </td>
-      </tr></table>
-    </td>
-  </tr>
-
-</table>
-</td></tr></table>
-</body></html>`;
-}
-
-function makeButton(text, url, color) {
-  return `<div style="text-align:center;margin:28px 0;">
-    <a href="${url}" style="background:${color};color:white;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">${text}</a>
-  </div>`;
-}
-
-function infoBox(bgColor, borderColor, label, value) {
-  return `<div style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:16px;margin:20px 0;">
-    <p style="margin:0 0 4px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;">${label}</p>
-    <p style="margin:0;font-size:16px;font-weight:600;color:#111827;">${value}</p>
-  </div>`;
-}
+const ADMINS = ['guillermogonzalezleon@gmail.com', 'sergiogaryf@gmail.com'];
 
 module.exports = async (req, res) => {
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Solo POST' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const RESEND_KEY = (process.env.VOY_RESEND_KEY || '').trim();
-  if (!RESEND_KEY) {
-    return res.status(500).json({ error: 'VOY_RESEND_KEY no configurado' });
+  const {
+    to, template, name, baseUrl,
+    workerName, clientName, service, price, bookingId,
+    // Quotation fields
+    laborTotal, materialsTotal, subtotal, commission, grandTotal, quoteId,
+  } = req.body;
+
+  if (!to || !template) {
+    return res.status(400).json({ error: 'Missing required fields: to, template' });
   }
 
-  const resend = new Resend(RESEND_KEY);
+  const siteUrl = baseUrl || 'https://voy-app-2.vercel.app';
+  const emailData = buildEmail(template, {
+    to, name, siteUrl, workerName, clientName, service, price, bookingId,
+    laborTotal, materialsTotal, subtotal, commission, grandTotal, quoteId,
+  });
+
+  if (!emailData) {
+    return res.status(400).json({ error: `Unknown template: ${template}` });
+  }
+
+  // Determine recipients: admin templates go to admins too
+  let recipients = [to];
+  if (template.startsWith('admin_') || template === 'new_quotation' || template === 'quotation_accepted' || template === 'quotation_rejected') {
+    recipients = [...new Set([to, ...ADMINS])];
+  }
 
   try {
-    const { to, type, name, specialty, description, clientEmail } = req.body;
-
-    if (!to || !type) {
-      return res.status(400).json({ error: 'Faltan campos: to, type' });
+    // Use Resend API
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.log('[send-email] No RESEND_API_KEY, simulating send to:', recipients);
+      return res.status(200).json({ success: true, simulated: true, recipients });
     }
 
-    const GREEN  = '#059669';
-    const PURPLE = '#7c3aed';
-    const BLUE   = '#0EA5E9';
-    const AMBER  = '#D97706';
-    const VIOLET = '#8B5CF6';
-
-    const templates = {
-
-      welcome: {
-        subject: '¡Bienvenido a VOY! 🎉',
-        color: GREEN,
-        html: emailLayout(`
-          <h1 style="margin:0 0 8px;font-size:24px;color:#111827;">¡Hola ${name || ''}! 👋</h1>
-          <p style="margin:0 0 20px;font-size:15px;color:#6b7280;">Tu cuenta ha sido creada exitosamente.</p>
-
-          <p style="font-size:15px;color:#374151;line-height:1.7;">
-            Ya eres parte de <strong>VOY</strong>, la plataforma de servicios locales de la Quinta Región.
-            Conecta con los mejores especialistas cerca de ti.
-          </p>
-
-          ${infoBox('#ecfdf5', '#a7f3d0', 'Tu cuenta', `📧 ${to}`)}
-
-          ${makeButton('Ingresar a VOY', 'https://voy-app-2.vercel.app/login', GREEN)}
-
-          <p style="font-size:13px;color:#9ca3af;text-align:center;">
-            Si no creaste esta cuenta, puedes ignorar este email.
-          </p>
-        `, GREEN),
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-
-      booking_confirmed: {
-        subject: '✅ ¡Reserva confirmada en VOY!',
-        color: GREEN,
-        html: emailLayout(`
-          <h1 style="margin:0 0 8px;font-size:24px;color:#111827;">¡Reserva confirmada! ✅</h1>
-          <p style="margin:0 0 20px;font-size:15px;color:#6b7280;">Tu servicio ha sido agendado exitosamente.</p>
-
-          <p style="font-size:15px;color:#374151;line-height:1.7;">
-            Hola <strong>${name || ''}</strong>, tu especialista ya fue notificado y confirmó tu solicitud.
-            Revisa los detalles en tu panel.
-          </p>
-
-          ${infoBox('#ecfdf5', '#a7f3d0', 'Estado', '🟢 Confirmado — El especialista está en camino')}
-
-          ${makeButton('Ver mis servicios', 'https://voy-app-2.vercel.app/client', GREEN)}
-        `, GREEN),
-      },
-
-      new_request: {
-        subject: '📋 Nueva solicitud de servicio en VOY',
-        color: BLUE,
-        html: emailLayout(`
-          <h1 style="margin:0 0 8px;font-size:24px;color:#111827;">Nueva solicitud 📋</h1>
-          <p style="margin:0 0 20px;font-size:15px;color:#6b7280;">Tienes una nueva solicitud de servicio.</p>
-
-          <p style="font-size:15px;color:#374151;line-height:1.7;">
-            Hola <strong>${name || ''}</strong>, un cliente cercano necesita tus servicios.
-            Revisa y responde desde tu panel de especialista.
-          </p>
-
-          ${infoBox('#e0f2fe', '#7dd3fc', 'Acción requerida', '⏳ Acepta o rechaza la solicitud')}
-
-          ${makeButton('Ver solicitudes', 'https://voy-app-2.vercel.app/worker', BLUE)}
-        `, BLUE),
-      },
-
-      specialty_request: {
-        subject: '🔍 Solicitud de nueva especialidad en VOY',
-        color: AMBER,
-        html: emailLayout(`
-          <h1 style="margin:0 0 8px;font-size:24px;color:#111827;">Nueva solicitud de especialidad</h1>
-          <p style="margin:0 0 20px;font-size:15px;color:#6b7280;">Un cliente busca un especialista que no existe en la plataforma.</p>
-
-          ${infoBox('#fef3c7', '#fde68a', 'Especialidad solicitada', `🔍 ${specialty || 'No especificada'}`)}
-
-          ${description ? `<div style="background:#f9fafb;border-radius:10px;padding:16px;margin:16px 0;">
-            <p style="margin:0 0 4px;font-weight:600;font-size:12px;text-transform:uppercase;color:#6b7280;">Descripción</p>
-            <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">${description}</p>
-          </div>` : ''}
-
-          <table width="100%" style="margin:16px 0;font-size:14px;color:#374151;">
-            <tr><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;"><strong>Cliente:</strong></td><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">${name || 'Anónimo'}</td></tr>
-            <tr><td style="padding:8px 0;"><strong>Email:</strong></td><td style="padding:8px 0;">${clientEmail || 'No proporcionado'}</td></tr>
-          </table>
-
-          ${makeButton('Ir al panel admin', 'https://voy-app-2.vercel.app/admin', AMBER)}
-        `, AMBER),
-      },
-
-      new_specialty: {
-        subject: '🆕 Nuevo especialista con categoría personalizada',
-        color: VIOLET,
-        html: emailLayout(`
-          <h1 style="margin:0 0 8px;font-size:24px;color:#111827;">Nuevo especialista registrado</h1>
-          <p style="margin:0 0 20px;font-size:15px;color:#6b7280;">Se registró con una categoría que no existe en la plataforma.</p>
-
-          ${infoBox('#ede9fe', '#c4b5fd', 'Especialidad sugerida', `🆕 ${specialty || 'Otro'}`)}
-
-          <table width="100%" style="margin:16px 0;font-size:14px;color:#374151;">
-            <tr><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;"><strong>Especialista:</strong></td><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">${name || ''}</td></tr>
-            <tr><td style="padding:8px 0;"><strong>Email:</strong></td><td style="padding:8px 0;">${clientEmail || 'No proporcionado'}</td></tr>
-          </table>
-
-          ${makeButton('Revisar en admin', 'https://voy-app-2.vercel.app/admin', VIOLET)}
-        `, VIOLET),
-      },
-    };
-
-    const template = templates[type];
-    if (!template) {
-      return res.status(400).json({ error: `Tipo no válido: ${type}. Usa: ${Object.keys(templates).join(', ')}` });
-    }
-
-    const recipients = ['specialty_request', 'new_specialty'].includes(type)
-      ? [to, 'sergiogaryf@gmail.com'].filter(Boolean)
-      : [to];
-
-    const { data, error } = await resend.emails.send({
-      from: 'VOY <onboarding@resend.dev>',
-      to: recipients,
-      subject: template.subject,
-      html: template.html,
+      body: JSON.stringify({
+        from: 'VOY <noreply@voy.cl>',
+        to: recipients,
+        subject: emailData.subject,
+        html: emailData.html,
+      }),
     });
 
-    if (error) {
-      return res.status(400).json({ error: 'Resend error', detail: error });
+    const result = await response.json();
+    if (!response.ok) {
+      console.error('[send-email] Resend error:', result);
+      return res.status(500).json({ error: 'Email send failed', detail: result });
     }
 
-    return res.status(200).json({ success: true, id: data.id });
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return res.status(200).json({ success: true, id: result.id, recipients });
+  } catch (err) {
+    console.error('[send-email] Error:', err);
+    return res.status(500).json({ error: err.message });
   }
 };
+
+/* ── Template builder ─────────────────────── */
+function buildEmail(template, data) {
+  const { siteUrl, name, workerName, clientName, service, price, bookingId,
+          laborTotal, materialsTotal, subtotal, commission, grandTotal, quoteId } = data;
+  const templates = {
+
+    // ── Welcome ──────────────────────────
+    welcome: {
+      subject: '¡Bienvenido a VOY!',
+      html: wrapEmail('¡Bienvenido a VOY!', '#2563eb', `
+        <h2 style="color:#1e293b;margin:0 0 8px;">¡Hola ${name || 'Usuario'}!</h2>
+        <p style="color:#64748b;font-size:15px;">Tu cuenta ha sido creada exitosamente. Ya puedes empezar a usar VOY para conectar con servicios locales en la Quinta Región.</p>
+        <a href="${siteUrl}/login/" style="display:inline-block;padding:12px 28px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:700;margin-top:16px;">Ingresar a VOY</a>
+      `),
+    },
+
+    // ── Admin: Nueva reserva ─────────────
+    admin_new_booking: {
+      subject: `[VOY] Nueva reserva: ${service || 'Servicio'}`,
+      html: wrapEmail('Nueva Reserva', '#2563eb', `
+        <h2 style="color:#1e293b;margin:0 0 8px;">Nueva Reserva Creada</h2>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Cliente</td><td style="padding:8px;font-weight:600;">${clientName || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Profesional</td><td style="padding:8px;font-weight:600;">${workerName || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Servicio</td><td style="padding:8px;font-weight:600;">${service || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Precio</td><td style="padding:8px;font-weight:600;">${formatCLP(price)}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Ref.</td><td style="padding:8px;font-weight:600;">${bookingId || '-'}</td></tr>
+        </table>
+        <a href="${siteUrl}/admin/" style="display:inline-block;padding:12px 28px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:700;">Ver en Admin</a>
+      `),
+    },
+
+    // ── Admin: Solicitud aceptada ────────
+    admin_request_accepted: {
+      subject: `[VOY] Solicitud aceptada: ${service || 'Servicio'}`,
+      html: wrapEmail('Solicitud Aceptada', '#059669', `
+        <h2 style="color:#059669;margin:0 0 8px;">Solicitud Aceptada</h2>
+        <p style="color:#64748b;font-size:15px;"><strong>${workerName || 'Profesional'}</strong> aceptó la solicitud de <strong>${clientName || 'Cliente'}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Servicio</td><td style="padding:8px;font-weight:600;">${service || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Precio</td><td style="padding:8px;font-weight:600;">${formatCLP(price)}</td></tr>
+        </table>
+        <a href="${siteUrl}/admin/" style="display:inline-block;padding:12px 28px;background:#059669;color:white;text-decoration:none;border-radius:8px;font-weight:700;">Ver en Admin</a>
+      `),
+    },
+
+    // ── Admin: Solicitud rechazada ───────
+    admin_request_rejected: {
+      subject: `[VOY] Solicitud rechazada: ${service || 'Servicio'}`,
+      html: wrapEmail('Solicitud Rechazada', '#dc2626', `
+        <h2 style="color:#dc2626;margin:0 0 8px;">Solicitud Rechazada</h2>
+        <p style="color:#64748b;font-size:15px;"><strong>${workerName || 'Profesional'}</strong> rechazó la solicitud de <strong>${clientName || 'Cliente'}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Servicio</td><td style="padding:8px;font-weight:600;">${service || '-'}</td></tr>
+        </table>
+      `),
+    },
+
+    // ── Admin: Trabajo completado ────────
+    admin_job_completed: {
+      subject: `[VOY] Trabajo completado: ${service || 'Servicio'}`,
+      html: wrapEmail('Trabajo Completado', '#059669', `
+        <h2 style="color:#059669;margin:0 0 8px;">Trabajo Completado</h2>
+        <p style="color:#64748b;font-size:15px;"><strong>${workerName || 'Profesional'}</strong> completó el trabajo para <strong>${clientName || 'Cliente'}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Servicio</td><td style="padding:8px;font-weight:600;">${service || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Precio</td><td style="padding:8px;font-weight:600;">${formatCLP(price)}</td></tr>
+        </table>
+        <a href="${siteUrl}/admin/" style="display:inline-block;padding:12px 28px;background:#059669;color:white;text-decoration:none;border-radius:8px;font-weight:700;">Ver en Admin</a>
+      `),
+    },
+
+    // ── Admin: Reserva cancelada ─────────
+    admin_booking_cancelled: {
+      subject: `[VOY] Reserva cancelada: ${service || 'Servicio'}`,
+      html: wrapEmail('Reserva Cancelada', '#dc2626', `
+        <h2 style="color:#dc2626;margin:0 0 8px;">Reserva Cancelada</h2>
+        <p style="color:#64748b;font-size:15px;"><strong>${clientName || 'Cliente'}</strong> canceló la reserva.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Servicio</td><td style="padding:8px;font-weight:600;">${service || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Profesional</td><td style="padding:8px;font-weight:600;">${workerName || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Ref.</td><td style="padding:8px;font-weight:600;">${bookingId || '-'}</td></tr>
+        </table>
+      `),
+    },
+
+    // ── Cotización: Nueva ────────────────
+    new_quotation: {
+      subject: `[VOY] Nueva cotización de ${workerName || 'Profesional'}`,
+      html: wrapEmail('Nueva Cotización', '#4f46e5', `
+        <h2 style="color:#4f46e5;margin:0 0 8px;">Nueva Cotización Recibida</h2>
+        <p style="color:#64748b;font-size:15px;"><strong>${workerName || 'Profesional'}</strong> te ha enviado una cotización para <strong>${service || 'servicio'}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Mano de obra</td><td style="padding:8px;font-weight:600;">${formatCLP(laborTotal)}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Materiales</td><td style="padding:8px;font-weight:600;">${formatCLP(materialsTotal)}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Subtotal</td><td style="padding:8px;font-weight:600;">${formatCLP(subtotal)}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Comisión VOY</td><td style="padding:8px;font-weight:600;">${formatCLP(commission)}</td></tr>
+          <tr style="background:#f0f0ff;"><td style="padding:10px;color:#4f46e5;font-weight:700;">TOTAL</td><td style="padding:10px;font-weight:800;color:#4f46e5;font-size:18px;">${formatCLP(grandTotal)}</td></tr>
+        </table>
+        <a href="${siteUrl}/client/" style="display:inline-block;padding:12px 28px;background:#4f46e5;color:white;text-decoration:none;border-radius:8px;font-weight:700;">Ver Cotización</a>
+      `),
+    },
+
+    // ── Cotización: Aceptada ─────────────
+    quotation_accepted: {
+      subject: `[VOY] Cotización aceptada: ${service || 'Servicio'}`,
+      html: wrapEmail('Cotización Aceptada', '#059669', `
+        <h2 style="color:#059669;margin:0 0 8px;">Cotización Aceptada</h2>
+        <p style="color:#64748b;font-size:15px;"><strong>${clientName || 'Cliente'}</strong> aceptó la cotización de <strong>${workerName || 'Profesional'}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Servicio</td><td style="padding:8px;font-weight:600;">${service || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Total</td><td style="padding:8px;font-weight:600;">${formatCLP(grandTotal)}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Ref.</td><td style="padding:8px;font-weight:600;">${quoteId || '-'}</td></tr>
+        </table>
+        <a href="${siteUrl}/worker/" style="display:inline-block;padding:12px 28px;background:#059669;color:white;text-decoration:none;border-radius:8px;font-weight:700;">Ver en Panel</a>
+      `),
+    },
+
+    // ── Cotización: Rechazada ────────────
+    quotation_rejected: {
+      subject: `[VOY] Cotización rechazada: ${service || 'Servicio'}`,
+      html: wrapEmail('Cotización Rechazada', '#dc2626', `
+        <h2 style="color:#dc2626;margin:0 0 8px;">Cotización Rechazada</h2>
+        <p style="color:#64748b;font-size:15px;"><strong>${clientName || 'Cliente'}</strong> rechazó la cotización de <strong>${workerName || 'Profesional'}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;color:#64748b;">Servicio</td><td style="padding:8px;font-weight:600;">${service || '-'}</td></tr>
+          <tr><td style="padding:8px;color:#64748b;">Ref.</td><td style="padding:8px;font-weight:600;">${quoteId || '-'}</td></tr>
+        </table>
+      `),
+    },
+  };
+
+  return templates[template] || null;
+}
+
+/* ── Email wrapper ────────────────────────── */
+function wrapEmail(title, accentColor, bodyHtml) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+    <div style="background:${accentColor};padding:24px 32px;text-align:center;">
+      <h1 style="color:white;margin:0;font-size:24px;font-weight:900;letter-spacing:-0.5px;">VOY</h1>
+      <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:13px;">${title}</p>
+    </div>
+    <div style="padding:32px;">
+      ${bodyHtml}
+    </div>
+    <div style="padding:20px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
+      <p style="color:#94a3b8;font-size:12px;margin:0;">VOY SpA — Quinta Región, Chile</p>
+    </div>
+  </div>
+</body></html>`;
+}
+
+function formatCLP(amount) {
+  if (!amount && amount !== 0) return '-';
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(amount);
+}

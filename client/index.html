@@ -56,26 +56,13 @@
 
     /* Booking modal adjustments */
     .booking-sections { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+    .badge-new { display:inline-block; padding:1px 6px; background:linear-gradient(135deg,#6366f1,#4f46e5); color:white; font-size:9px; font-weight:800; border-radius:var(--radius-full); letter-spacing:0.5px; vertical-align:middle; margin-left:4px; animation:pulseNew 2s infinite; }
+    @keyframes pulseNew { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
     @media (max-width: 768px) {
       .client-grid { grid-template-columns: 1fr; height: auto; }
       .worker-detail { width: 100%; right: 0; }
       .booking-sections { grid-template-columns: 1fr; }
     }
-    /* ── Autocomplete suggestions ── */
-    .search-suggestions {
-      position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
-      background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg); max-height: 320px; overflow-y: auto; margin-top: 4px;
-    }
-    .suggest-section { padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--gray-400);
-      text-transform: uppercase; letter-spacing: 0.05em; }
-    .suggest-item { padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px;
-      font-size: 14px; color: var(--gray-700); transition: background 0.15s; }
-    .suggest-item:hover, .suggest-item.active { background: var(--blue-50); color: var(--blue-700); }
-    .suggest-item i { width: 20px; text-align: center; color: var(--gray-400); }
-    .suggest-item:hover i { color: var(--blue-500); }
-    .suggest-highlight { font-weight: 700; color: var(--blue-600); }
-    .suggest-item-sub { font-size: 12px; color: var(--gray-400); margin-left: auto; }
   </style>
 </head>
 <body>
@@ -90,10 +77,9 @@
     <span class="topbar-role">Cliente</span>
   </div>
   <div class="topbar-center">
-    <div class="topbar-search" style="position:relative;">
+    <div class="topbar-search">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" placeholder="Buscar servicio, especialista..." id="mainSearch" oninput="onSearchInput()" autocomplete="off" />
-      <div id="searchSuggestions" class="search-suggestions" style="display:none;"></div>
+      <input type="text" placeholder="Buscar servicio, profesional..." id="mainSearch" oninput="filterWorkers()" />
     </div>
   </div>
   <div class="topbar-actions">
@@ -145,10 +131,6 @@
       </a>
       <a class="sidebar-link" onclick="showView('perfil', this)">
         <i class="fa-solid fa-user-circle"></i> Mi perfil
-      </a>
-      <span class="sidebar-section-label">Soporte</span>
-      <a class="sidebar-link" onclick="openRequestSpecialty()" style="color:var(--color-warning);">
-        <i class="fa-solid fa-lightbulb"></i> Solicitar especialidad
       </a>
     </nav>
     <div class="sidebar-footer">
@@ -206,15 +188,10 @@
           </div>
           <!-- Results count -->
           <div style="display:flex; align-items:center; justify-content:space-between; padding: 0 var(--sp-1);">
-            <span id="resultsCount" style="font-size:var(--text-sm); color:var(--gray-500);">10 especialistas encontrados</span>
-            <div style="display:flex;align-items:center;gap:var(--sp-2);">
-              <button class="btn btn-ghost btn-sm" onclick="openRequestSpecialty()" style="font-size:11px;color:var(--color-warning);" title="¿No encuentras lo que buscas?">
-                <i class="fa-solid fa-lightbulb"></i> Solicitar especialidad
-              </button>
-              <div class="view-tabs" style="padding: 2px; width: auto;">
-                <button class="view-tab active" id="tabList" onclick="setListView('list')"><i class="fa-solid fa-list"></i></button>
-                <button class="view-tab" id="tabGrid" onclick="setListView('grid')"><i class="fa-solid fa-grip"></i></button>
-              </div>
+            <span id="resultsCount" style="font-size:var(--text-sm); color:var(--gray-500);">10 profesionales encontrados</span>
+            <div class="view-tabs" style="padding: 2px; width: auto;">
+              <button class="view-tab active" id="tabList" onclick="setListView('list')"><i class="fa-solid fa-list"></i></button>
+              <button class="view-tab" id="tabGrid" onclick="setListView('grid')"><i class="fa-solid fa-grip"></i></button>
             </div>
           </div>
           <!-- Providers list -->
@@ -282,7 +259,7 @@
     <div class="chat-header">
       <img src="https://i.pravatar.cc/40?img=11" alt="" class="avatar avatar-sm" id="chatWorkerAvatar" />
       <div class="chat-header-info">
-        <div class="chat-header-name" id="chatWorkerName">Especialista</div>
+        <div class="chat-header-name" id="chatWorkerName">Profesional</div>
         <div class="chat-header-status"><span class="status-dot online" style="display:inline-block;"></span> En línea</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="toggleChat()"><i class="fa-solid fa-xmark"></i></button>
@@ -409,8 +386,21 @@
   </div>
 </div>
 
+<!-- Quotation View Modal -->
+<div class="modal-overlay" id="quotationViewModal">
+  <div class="modal" style="max-width:580px;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-header" style="flex-shrink:0;">
+      <h3 style="font-weight:700;color:var(--gray-900);"><i class="fa-solid fa-file-invoice-dollar" style="color:#4f46e5;"></i> Cotización <span class="badge-new">NUEVO</span></h3>
+      <button class="modal-close" onclick="VOY.closeModal('quotationViewModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" id="quoteViewBody" style="flex:1;overflow-y:auto;"></div>
+    <div class="modal-footer" id="quoteViewActions" style="flex-shrink:0;"></div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/airtable.js"></script>
