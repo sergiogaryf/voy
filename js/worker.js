@@ -300,6 +300,11 @@ function buildRequestCard(r) {
       <button class="btn btn-success btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'accepted')">
         <i class="fa-solid fa-check"></i> Aceptar
       </button>
+    </div>` : r.status === 'accepted' ? `
+    <div style="display:flex; gap:var(--sp-3); margin-top:var(--sp-4);">
+      <button class="btn btn-outline btn-sm flex-1" style="color:#4f46e5;border-color:#4f46e5;" onclick="openQuotationModal('${r._recordId}')">
+        <i class="fa-solid fa-file-invoice-dollar"></i> Cotizar
+      </button>
     </div>` : ''}
     <div style="margin-top:var(--sp-3); font-size:var(--text-xs); color:var(--gray-400);">Ref. ${r.id}</div>
   </div>`;
@@ -1089,8 +1094,13 @@ async function submitQuotation() {
   const grandTotal = subtotal + commission;
   const notes = document.getElementById('qNotes')?.value || '';
 
-  const client = VOY_DATA.clients.find(c => c.id === req.clientId);
-  const matchBooking = VOY_DATA.bookings.find(b => req.service === b.service && b.clientId === req.clientId);
+  let clientId = req.clientId || 0;
+  let client = VOY_DATA.clients.find(c => c.id === clientId);
+  if (!client && req.clientName) {
+    client = VOY_DATA.clients.find(c => c.name === req.clientName);
+    clientId = client?.id || 0;
+  }
+  const matchBooking = VOY_DATA.bookings.find(b => req.service === b.service && (b.clientId === clientId || b.clientId === req.clientId));
 
   const btn = document.querySelector('#quotationModal .btn-primary');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; }
@@ -1099,10 +1109,10 @@ async function submitQuotation() {
     const quote = await VoyDB.createQuotation({
       bookingRecordId: matchBooking?._recordId || '',
       workerRecordId: workerData?._recordId || '',
-      clientId: req.clientId,
+      clientId: clientId,
       workerName: workerData?.name || '',
       clientName: req.clientName || '',
-      clientEmail: client?.email || '',
+      clientEmail: client?.email || req.clientEmail || '',
       service: req.service,
       laborRate: rate,
       laborHours: hours,

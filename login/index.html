@@ -390,6 +390,7 @@
     const a = accounts[type];
     document.getElementById('loginEmail').value    = a.email;
     document.getElementById('loginPassword').value = a.password;
+    setTimeout(() => doLogin(), 300);
   }
 
   function showError(formId, msg) {
