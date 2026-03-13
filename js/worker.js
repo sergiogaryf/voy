@@ -1184,12 +1184,19 @@ async function submitQuotation() {
 
 /* ── PDF Generation (jsPDF) ──────────────── */
 function generateVoyPDF(data) {
-  if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
-    console.warn('jsPDF no disponible — PDF no generado');
+  if (typeof window.jspdf === 'undefined') {
+    // Cargar dinámicamente y reintentar
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+    s.onload = () => generateVoyPDF(data);
+    s.onerror = () => console.warn('No se pudo cargar jsPDF');
+    document.head.appendChild(s);
     return;
   }
+  try {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const rRect = (x,y,w,h,r1,r2,style) => { try { doc.roundedRect(x,y,w,h,r1,r2,style); } catch(e) { doc.rect(x,y,w,h,style); } };
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   const fmtP = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(n || 0);
@@ -1220,7 +1227,7 @@ function generateVoyPDF(data) {
 
   // Info box
   doc.setFillColor(245, 243, 255);
-  doc.roundedRect(20, y - 5, pw - 40, 28, 3, 3, 'F');
+  rRect(20, y - 5, pw - 40, 28, 3, 3, 'F');
   doc.setFontSize(10);
   doc.setTextColor(80);
   doc.setFont('helvetica', 'bold');
@@ -1257,7 +1264,7 @@ function generateVoyPDF(data) {
   const materials = data.materials || [];
   if (materials.length) {
     doc.setFillColor(124, 58, 237);
-    doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
+    rRect(20, y, pw - 40, 8, 2, 2, 'F');
     doc.setFontSize(11);
     doc.setTextColor(255);
     doc.setFont('helvetica', 'bold');
@@ -1305,7 +1312,7 @@ function generateVoyPDF(data) {
 
   // Total grande
   doc.setFillColor(124, 58, 237);
-  doc.roundedRect(20, y - 4, pw - 40, 14, 3, 3, 'F');
+  rRect(20, y - 4, pw - 40, 14, 3, 3, 'F');
   doc.setFontSize(16);
   doc.setTextColor(255);
   doc.setFont('helvetica', 'bold');
@@ -1339,6 +1346,11 @@ function generateVoyPDF(data) {
   doc.text('Quinta Región, Chile · www.voy.cl · Documento generado automáticamente', pw / 2, ph - 6, { align: 'center' });
 
   doc.save(`Cotizacion_VOY_${data.quoteId}.pdf`);
+  VOY.showToast('PDF descargado', 'success');
+  } catch (e) {
+    console.error('PDF error:', e);
+    VOY.showToast('Error generando PDF: ' + e.message, 'error');
+  }
 }
 
 function fmtCLP(n) {

@@ -1298,6 +1298,7 @@ function downloadQuotationPDF(recordId) {
   try {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const rRect = (x,y,w,h,r1,r2,style) => { try { doc.roundedRect(x,y,w,h,r1,r2,style); } catch(e) { doc.rect(x,y,w,h,style); } };
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
 
@@ -1323,7 +1324,7 @@ function downloadQuotationPDF(recordId) {
 
   // Info box
   doc.setFillColor(245, 243, 255);
-  doc.roundedRect(20, y - 5, pw - 40, 28, 3, 3, 'F');
+  rRect(20, y - 5, pw - 40, 28, 3, 3, 'F');
   doc.setFontSize(10);
   doc.setTextColor(80);
   doc.setFont('helvetica', 'bold');
@@ -1340,7 +1341,7 @@ function downloadQuotationPDF(recordId) {
 
   // Mano de obra
   doc.setFillColor(124, 58, 237);
-  doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
+  rRect(20, y, pw - 40, 8, 2, 2, 'F');
   doc.setFontSize(11);
   doc.setTextColor(255);
   doc.setFont('helvetica', 'bold');
@@ -1359,7 +1360,7 @@ function downloadQuotationPDF(recordId) {
   const mats = q.materials || [];
   if (mats.length) {
     doc.setFillColor(124, 58, 237);
-    doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
+    rRect(20, y, pw - 40, 8, 2, 2, 'F');
     doc.setFontSize(11);
     doc.setTextColor(255);
     doc.setFont('helvetica', 'bold');
@@ -1402,7 +1403,7 @@ function downloadQuotationPDF(recordId) {
 
   // Total grande
   doc.setFillColor(124, 58, 237);
-  doc.roundedRect(20, y - 4, pw - 40, 14, 3, 3, 'F');
+  rRect(20, y - 4, pw - 40, 14, 3, 3, 'F');
   doc.setFontSize(16);
   doc.setTextColor(255);
   doc.setFont('helvetica', 'bold');
