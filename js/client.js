@@ -1048,6 +1048,29 @@ async function loadNotifications() {
     notifs.push({ icon: '⭐', bg: '#fef3c7', text: `Califica tu servicio de <strong>${b.category}</strong> del ${b.date}.`, time: 'Pendiente', unread: true });
   });
 
+  // Solicitudes de especialidad pendientes
+  const specRequests = JSON.parse(localStorage.getItem('voy_specialty_requests') || '[]');
+  specRequests.forEach(r => {
+    const reqDate = new Date(r.date);
+    const hoursAgo = Math.round((Date.now() - reqDate.getTime()) / 3600000);
+    const deadline = new Date(reqDate.getTime() + 48 * 3600000);
+    const hoursLeft = Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000));
+
+    let timeText, statusText;
+    if (r.status === 'pending' && hoursLeft > 0) {
+      timeText = hoursAgo < 1 ? 'Hace un momento' : `Hace ${hoursAgo}h`;
+      statusText = `Buscamos un especialista en <strong>"${r.specialty}"</strong> para ti. Tiempo estimado: <strong>${hoursLeft}h</strong> restantes.`;
+    } else if (r.status === 'pending') {
+      timeText = 'En proceso';
+      statusText = `Seguimos trabajando en encontrar un especialista en <strong>"${r.specialty}"</strong>. Te contactaremos pronto.`;
+    } else {
+      timeText = 'Resuelto';
+      statusText = `¡Ya tenemos un especialista en <strong>"${r.specialty}"</strong> disponible!`;
+    }
+
+    notifs.push({ icon: '🔍', bg: '#fef3c7', text: statusText, time: timeText, unread: r.status === 'pending' });
+  });
+
   if (!notifs.length) {
     notifs.push({ icon: '💡', bg: '#dbeafe', text: 'No tienes notificaciones pendientes.', time: 'Ahora', unread: false });
   }
@@ -1209,15 +1232,21 @@ document.addEventListener('click', (e) => {
 
 function openRequestSpecialty() {
   const searchVal = document.getElementById('mainSearch')?.value || '';
-  const existingModal = document.getElementById('specialtyRequestModal');
-  if (existingModal) {
-    VOY.openModal('specialtyRequestModal');
-    return;
-  }
-  // Create modal dynamically
+  // Remove old modal if exists
+  document.getElementById('specialtyRequestModal')?.remove();
+
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.id = 'specialtyRequestModal';
+
+  // Show pending requests count
+  const pendingCount = JSON.parse(localStorage.getItem('voy_specialty_requests') || '[]').filter(r => r.status === 'pending').length;
+  const pendingBanner = pendingCount > 0
+    ? `<div style="background:var(--blue-50);border:1px solid var(--blue-200);border-radius:var(--radius-lg);padding:var(--sp-3);margin-bottom:var(--sp-4);font-size:var(--text-sm);">
+        <i class="fa-solid fa-clock" style="color:var(--color-primary);"></i>
+        Tienes <strong>${pendingCount}</strong> solicitud${pendingCount > 1 ? 'es' : ''} en proceso. Revisa tus <a href="#" onclick="VOY.closeModal('specialtyRequestModal');showView('notifs',null);" style="color:var(--color-primary);font-weight:600;">notificaciones</a>.
+      </div>` : '';
+
   modal.innerHTML = `
     <div class="modal" style="max-width:480px;">
       <div class="modal-header">
@@ -1225,8 +1254,10 @@ function openRequestSpecialty() {
         <button class="modal-close" onclick="VOY.closeModal('specialtyRequestModal')">&times;</button>
       </div>
       <div class="modal-body">
+        ${pendingBanner}
         <p style="color:var(--gray-500);font-size:var(--text-sm);margin-bottom:var(--sp-4);">
           ¿No encuentras lo que buscas? Cuéntanos qué especialista necesitas y lo buscaremos por ti.
+          <strong>Tiempo de respuesta: 24-48 horas hábiles.</strong>
         </p>
         <div class="input-group" style="margin-bottom:var(--sp-3);">
           <label class="input-label">Especialidad que necesitas</label>
@@ -1273,10 +1304,24 @@ async function submitSpecialtyRequest() {
       }),
     });
 
+    // Guardar en localStorage para mostrar en notificaciones
+    const requests = JSON.parse(localStorage.getItem('voy_specialty_requests') || '[]');
+    requests.unshift({
+      specialty: name,
+      description: desc,
+      email: email,
+      date: new Date().toISOString(),
+      status: 'pending',
+    });
+    localStorage.setItem('voy_specialty_requests', JSON.stringify(requests));
+
     VOY.closeModal('specialtyRequestModal');
     document.getElementById('specialtyRequestModal')?.remove();
     VOY.showToast('¡Solicitud enviada! Estamos buscando un especialista para ti.', 'success');
-    setTimeout(() => VOY.showToast('Te notificaremos cuando tengamos un especialista disponible.', 'info'), 2000);
+    setTimeout(() => VOY.showToast('Tiempo estimado: 24-48 horas hábiles.', 'info'), 2000);
+
+    // Refrescar notificaciones
+    loadNotifications();
   } catch (e) {
     VOY.showToast('Error al enviar. Intenta de nuevo.', 'error');
   } finally {
