@@ -998,10 +998,12 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 /* ── Email helper ─────────────────────────── */
 function sendVoyEmail(to, template, extra = {}) {
   if (!to) return;
+  const siteUrl = (typeof VOY_BUILD !== 'undefined' && VOY_BUILD.url)
+    ? `https://${VOY_BUILD.url}` : window.location.origin;
   fetch('/api/send-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, template, baseUrl: VOY_SITE_URL, ...extra }),
+    body: JSON.stringify({ to, template, baseUrl: siteUrl, ...extra }),
   }).catch(e => console.warn('Email send failed:', e));
 }
 
@@ -1126,18 +1128,16 @@ async function submitQuotation() {
       notes,
     });
 
-    // Email al cliente + admins
-    sendVoyEmail(client?.email || '', 'new_quotation', {
+    VOY.closeModal('quotationModal');
+    VOY.showToast('Cotización enviada exitosamente', 'success');
+
+    // Email y PDF fuera del try principal — no deben bloquear el éxito
+    try { sendVoyEmail(client?.email || '', 'new_quotation', {
       workerName: workerData?.name, clientName: req.clientName,
       service: req.service, laborTotal, materialsTotal, subtotal, commission, grandTotal,
       quoteId: quote.quoteId,
-    });
-
-    // Generar PDF
-    try { generateVoyPDF(quote); } catch(e) { console.warn('PDF generation failed:', e); }
-
-    VOY.closeModal('quotationModal');
-    VOY.showToast('Cotización enviada exitosamente', 'success');
+    }); } catch(e) { console.warn('Email failed:', e); }
+    try { generateVoyPDF(quote); } catch(e) { console.warn('PDF failed:', e); }
   } catch (e) {
     console.error(e);
     VOY.showToast('Error al enviar cotización', 'error');

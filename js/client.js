@@ -1130,10 +1130,12 @@ function showView(name, el) {
 /* ── Email helper ─────────────────────────── */
 function sendVoyEmail(to, template, extra = {}) {
   if (!to) return;
+  const siteUrl = (typeof VOY_BUILD !== 'undefined' && VOY_BUILD.url)
+    ? `https://${VOY_BUILD.url}` : window.location.origin;
   fetch('/api/send-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, template, baseUrl: VOY_SITE_URL, ...extra }),
+    body: JSON.stringify({ to, template, baseUrl: siteUrl, ...extra }),
   }).catch(e => console.warn('Email send failed:', e));
 }
 
