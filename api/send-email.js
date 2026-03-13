@@ -1,10 +1,10 @@
 /* ============================================
    VOY — API: Envío de emails
-   Usa Resend (resend.com) — gratis 100 emails/día
+   Usa Resend SDK — gratis 100 emails/día
    Env var requerida: VOY_RESEND_KEY
    ============================================ */
 
-const https = require('https');
+const { Resend } = require('resend');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,6 +17,8 @@ module.exports = async (req, res) => {
   if (!RESEND_KEY) {
     return res.status(500).json({ error: 'VOY_RESEND_KEY no configurado' });
   }
+
+  const resend = new Resend(RESEND_KEY);
 
   try {
     const { to, type, name, specialty, description, clientEmail } = req.body;
@@ -171,48 +173,22 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: `Tipo de email no válido: ${type}. Usa: ${Object.keys(templates).join(', ')}` });
     }
 
-    // Enviar via Resend API
     const recipients = ['specialty_request', 'new_specialty'].includes(type)
       ? [to, 'sergiogaryf@gmail.com'].filter(Boolean)
       : [to];
 
-    const emailBody = JSON.stringify({
+    const { data, error } = await resend.emails.send({
       from: 'VOY <onboarding@resend.dev>',
       to: recipients,
       subject: template.subject,
       html: template.html,
     });
 
-    const result = await new Promise((resolve, reject) => {
-      const options = {
-        hostname: 'api.resend.com',
-        path: '/emails',
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_KEY}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(emailBody),
-        },
-      };
-
-      const r = https.request(options, (response) => {
-        let data = '';
-        response.on('data', c => data += c);
-        response.on('end', () => {
-          try { resolve({ status: response.statusCode, data: JSON.parse(data) }); }
-          catch { resolve({ status: response.statusCode, data: { raw: data } }); }
-        });
-      });
-      r.on('error', reject);
-      r.write(emailBody);
-      r.end();
-    });
-
-    if (result.status >= 400) {
-      return res.status(result.status).json({ error: 'Resend error', detail: result.data });
+    if (error) {
+      return res.status(400).json({ error: 'Resend error', detail: error });
     }
 
-    return res.status(200).json({ success: true, id: result.data.id });
+    return res.status(200).json({ success: true, id: data.id });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
