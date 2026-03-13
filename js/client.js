@@ -620,6 +620,16 @@ function loadActiveServices() {
     const worker = VOY_DATA.workers.find(w => w.id === b.workerId);
     const statusColors = { active: 'badge-green', pending: 'badge-yellow' };
     const statusLabels = { active: 'En curso', pending: 'Pendiente' };
+    // Check for quotations matching this booking
+    const quotes = (clientQuotations || []).filter(q => q.service === b.service);
+    const quoteBadgesHtml = quotes.map(q => {
+      const qColor = q.status === 'accepted' ? '#10b981' : q.status === 'rejected' ? '#ef4444' : '#4f46e5';
+      const qLabel = q.status === 'accepted' ? 'Aprobada' : q.status === 'rejected' ? 'Rechazada' : 'Pendiente';
+      return `<div class="quote-badge" style="background:${qColor}0d;border:1.5px solid ${qColor}40;border-radius:12px;padding:8px 12px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;color:${qColor};font-weight:600;"><i class="fa-solid fa-file-invoice-dollar"></i> Cotización ${qLabel} — ${VOY.formatCLP(q.grandTotal)} <span class="badge-new" style="background:${qColor};color:#fff;padding:2px 6px;border-radius:99px;font-size:10px;">NUEVO</span></span>
+        <button class="btn btn-sm" style="background:${qColor};color:white;padding:4px 12px;font-size:12px;" onclick="event.stopPropagation();openQuotationView('${q._recordId}')">Ver cotización</button>
+      </div>`;
+    }).join('');
     return `
     <div class="card" style="margin-bottom:var(--sp-4);">
       <div class="card-body">
@@ -645,6 +655,7 @@ function loadActiveServices() {
           <button class="btn btn-outline btn-sm" onclick="openChatWithWorker(${b.workerId})"><i class="fa-solid fa-comment-dots"></i> Mensaje</button>
           ${b.status === 'active' ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b._recordId}')"><i class="fa-solid fa-xmark"></i> Cancelar</button>` : ''}
         </div>
+        ${quoteBadgesHtml}
       </div>
     </div>`;
   }).join('');
@@ -1157,8 +1168,8 @@ async function loadPendingQuotations() {
       badge.textContent = activeCount + pending.length;
       badge.style.display = '';
     }
-    // Add quotation indicators to active services
-    addQuotationBadges();
+    // Re-render active services with quotation badges
+    loadActiveServices();
   } catch (e) {
     console.warn('Error loading quotations:', e);
   }

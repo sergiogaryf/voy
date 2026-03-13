@@ -5,6 +5,7 @@
 let workerData = null;
 let workerSession = null;
 let workerRequests = [];
+let workerQuotations = [];
 
 let workerChatConversationId = null;
 let workerChatPollInterval    = null;
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Mostrar info de sesión en la UI
     VoyAuth.applySessionToUI(workerSession);
     workerRequests = await VoyDB.getRequests(workerData?._recordId);
+    workerQuotations = await VoyDB.getQuotationsByWorker(workerData?._recordId).catch(() => []);
 
     buildEarningsChart();
     loadWorkerDashboard();   // carga stats + trabajo activo + solicitudes preview
@@ -251,6 +253,58 @@ function renderRequests() {
   el.innerHTML = workerRequests.map(r => buildRequestCard(r)).join('');
 }
 
+function getQuotationsForRequest(requestRecordId) {
+  return workerQuotations.filter(q => {
+    const req = workerRequests.find(r => r._recordId === requestRecordId);
+    return req && q.service === req.service && q.clientName === req.clientName;
+  });
+}
+
+function buildQuotationBadge(r) {
+  const quotes = getQuotationsForRequest(r._recordId);
+  if (!quotes.length) return '';
+  const statusColors = { pending: '#f59e0b', accepted: '#10b981', rejected: '#ef4444' };
+  const statusLabels = { pending: 'Pendiente', accepted: 'Aprobada', rejected: 'Rechazada' };
+  return quotes.map(q => {
+    const color = statusColors[q.status] || '#6b7280';
+    const label = statusLabels[q.status] || q.status;
+    return `<div style="display:flex;align-items:center;gap:var(--sp-2);margin-top:var(--sp-3);padding:var(--sp-3);background:${color}12;border:1px solid ${color}40;border-radius:var(--radius-md);">
+      <i class="fa-solid fa-file-invoice-dollar" style="color:${color};"></i>
+      <span style="font-size:var(--text-sm);font-weight:600;color:${color};">${label}</span>
+      <span style="font-size:var(--text-xs);color:var(--gray-500);">${q.quoteId} · ${VOY.formatCLP(q.grandTotal)}</span>
+      <span class="badge-new" style="margin-left:auto;font-size:10px;background:${color};color:#fff;padding:2px 6px;border-radius:var(--radius-full);">NUEVO</span>
+    </div>`;
+  }).join('');
+}
+
+function buildRequestActions(r) {
+  const hasQuote = getQuotationsForRequest(r._recordId).length > 0;
+  if (r.status === 'pending') {
+    return `<div style="display:flex; gap:var(--sp-3); margin-top:var(--sp-4);">
+      <button class="btn btn-ghost btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'declined')">
+        <i class="fa-solid fa-xmark"></i> Rechazar
+      </button>
+      <button class="btn btn-outline btn-sm flex-1" onclick="openWorkerChat(${r.clientId || 0}, '${(r.clientName || 'Cliente').replace(/'/g, "\\'")}')">
+        <i class="fa-solid fa-comment-dots"></i> Preguntar
+      </button>
+      <button class="btn btn-outline btn-sm flex-1" style="color:#4f46e5;border-color:#4f46e5;" onclick="openQuotationModal('${r._recordId}')">
+        <i class="fa-solid fa-file-invoice-dollar"></i> ${hasQuote ? 'Nueva cotización' : 'Cotizar'}
+      </button>
+      <button class="btn btn-success btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'accepted')">
+        <i class="fa-solid fa-check"></i> Aceptar
+      </button>
+    </div>`;
+  }
+  if (r.status === 'accepted') {
+    return `<div style="display:flex; gap:var(--sp-3); margin-top:var(--sp-4);">
+      <button class="btn btn-outline btn-sm" style="color:#4f46e5;border-color:#4f46e5;" onclick="openQuotationModal('${r._recordId}')">
+        <i class="fa-solid fa-file-invoice-dollar"></i> ${hasQuote ? 'Nueva cotización' : 'Cotizar'}
+      </button>
+    </div>`;
+  }
+  return '';
+}
+
 function buildRequestCard(r) {
   const commission = Math.round(r.estimatedPrice * 0.15);
   const net = r.estimatedPrice - commission;
@@ -286,26 +340,8 @@ function buildRequestCard(r) {
         </div>
       </div>
     </div>
-    ${r.status === 'pending' ? `
-    <div style="display:flex; gap:var(--sp-3); margin-top:var(--sp-4);">
-      <button class="btn btn-ghost btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'declined')">
-        <i class="fa-solid fa-xmark"></i> Rechazar
-      </button>
-      <button class="btn btn-outline btn-sm flex-1" onclick="openWorkerChat(${r.clientId || 0}, '${(r.clientName || 'Cliente').replace(/'/g, "\\'")}')">
-        <i class="fa-solid fa-comment-dots"></i> Preguntar
-      </button>
-      <button class="btn btn-outline btn-sm flex-1" style="color:#4f46e5;border-color:#4f46e5;" onclick="openQuotationModal('${r._recordId}')">
-        <i class="fa-solid fa-file-invoice-dollar"></i> Cotizar <span class="badge-new">NUEVO</span>
-      </button>
-      <button class="btn btn-success btn-sm flex-1" onclick="handleRequest('${r._recordId}', 'accepted')">
-        <i class="fa-solid fa-check"></i> Aceptar
-      </button>
-    </div>` : r.status === 'accepted' ? `
-    <div style="display:flex; gap:var(--sp-3); margin-top:var(--sp-4);">
-      <button class="btn btn-outline btn-sm flex-1" style="color:#4f46e5;border-color:#4f46e5;" onclick="openQuotationModal('${r._recordId}')">
-        <i class="fa-solid fa-file-invoice-dollar"></i> Cotizar
-      </button>
-    </div>` : ''}
+    ${buildRequestActions(r)}
+    ${buildQuotationBadge(r)}
     <div style="margin-top:var(--sp-3); font-size:var(--text-xs); color:var(--gray-400);">Ref. ${r.id}</div>
   </div>`;
 }
