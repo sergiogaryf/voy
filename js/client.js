@@ -649,6 +649,7 @@ function loadActiveServices() {
           <div style="text-align:right;">
             <div style="font-weight:700; color:var(--color-primary); font-size:var(--text-lg);">${VOY.formatCLP(b.price)}</div>
             <div style="font-size:var(--text-xs); color:var(--gray-400);">Ref: ${b.id}</div>
+            ${(() => { const aq = (clientQuotations || []).filter(q => q.service === b.service && q.status === 'accepted'); return aq.length ? `<div style="font-size:var(--text-xs);color:#10b981;font-weight:600;margin-top:4px;">Cotizaciones aprobadas: ${VOY.formatCLP(aq.reduce((s,q) => s + q.grandTotal, 0))}</div>` : ''; })()}
           </div>
         </div>
         <div style="display:flex; gap:var(--sp-3); margin-top:var(--sp-4);">
@@ -1287,49 +1288,147 @@ function downloadQuotationPDF(recordId) {
   const q = clientQuotations.find(x => x._recordId === recordId);
   if (!q) return;
   if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
-    VOY.showToast('jsPDF no disponible', 'error');
+    VOY.showToast('Cargando generador PDF...', 'info');
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+    s.onload = () => downloadQuotationPDF(recordId);
+    document.head.appendChild(s);
     return;
   }
-  // Reuse same PDF generation as worker
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const pw = doc.internal.pageSize.getWidth();
-  let y = 20;
+  const ph = doc.internal.pageSize.getHeight();
 
-  doc.setFontSize(28); doc.setTextColor(37, 99, 235); doc.text('VOY', 20, y);
-  doc.setFontSize(14); doc.setTextColor(100); doc.text('Cotización de Servicio', pw - 20, y, { align: 'right' });
-  y += 10; doc.setFontSize(10); doc.text(`Fecha: ${q.createdAt ? new Date(q.createdAt).toLocaleDateString('es-CL') : ''}`, pw - 20, y, { align: 'right' });
-  y += 5; doc.text(`Ref: ${q.quoteId}`, pw - 20, y, { align: 'right' }); y += 12;
-  doc.setDrawColor(200); doc.line(20, y, pw - 20, y); y += 10;
-  doc.setFontSize(11); doc.setTextColor(50);
-  doc.text(`Especialista: ${q.workerName}`, 20, y); doc.text(`Cliente: ${q.clientName}`, pw / 2, y); y += 6;
-  doc.text(`Servicio: ${q.service}`, 20, y); y += 12;
+  // Marca de agua
+  doc.setFontSize(120);
+  doc.setTextColor(230, 230, 240);
+  doc.text('VOY', pw / 2, ph / 2, { align: 'center', angle: 45 });
 
-  doc.setFontSize(12); doc.setTextColor(37, 99, 235); doc.text('Mano de Obra', 20, y); y += 8;
-  doc.setFontSize(10); doc.setTextColor(80);
-  doc.text(`${fmtCLPClient(q.laborRate)}/hora x ${q.laborHours} horas = ${fmtCLPClient(q.laborTotal)}`, 25, y); y += 10;
+  // Franja superior
+  doc.setFillColor(124, 58, 237);
+  doc.rect(0, 0, pw, 35, 'F');
+  doc.setFontSize(28);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.text('VOY', 20, 24);
+  doc.setFontSize(13);
+  doc.setFont(undefined, 'normal');
+  doc.text('Cotización de Servicio', pw - 20, 18, { align: 'right' });
+  doc.setFontSize(10);
+  doc.text(`${q.quoteId} · ${q.createdAt ? new Date(q.createdAt).toLocaleDateString('es-CL') : ''}`, pw - 20, 28, { align: 'right' });
 
+  let y = 50;
+
+  // Info box
+  doc.setFillColor(245, 243, 255);
+  doc.roundedRect(20, y - 5, pw - 40, 28, 3, 3, 'F');
+  doc.setFontSize(10);
+  doc.setTextColor(80);
+  doc.setFont(undefined, 'bold');
+  doc.text('Especialista:', 25, y + 4);
+  doc.text('Cliente:', pw / 2, y + 4);
+  doc.setFont(undefined, 'normal');
+  doc.text(q.workerName || '', 25, y + 12);
+  doc.text(q.clientName || '', pw / 2, y + 12);
+  doc.setFont(undefined, 'bold');
+  doc.text('Servicio:', 25, y + 20);
+  doc.setFont(undefined, 'normal');
+  doc.text(q.service || '', 65, y + 20);
+  y += 35;
+
+  // Mano de obra
+  doc.setFillColor(124, 58, 237);
+  doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
+  doc.setFontSize(11);
+  doc.setTextColor(255);
+  doc.setFont(undefined, 'bold');
+  doc.text('Mano de Obra', 25, y + 6);
+  y += 14;
+  doc.setTextColor(60);
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.text(`Tarifa/hora: ${fmtCLPClient(q.laborRate)}`, 25, y);
+  doc.text(`Horas: ${q.laborHours}`, 100, y);
+  doc.setFont(undefined, 'bold');
+  doc.text(fmtCLPClient(q.laborTotal), pw - 25, y, { align: 'right' });
+  y += 10;
+
+  // Materiales
   const mats = q.materials || [];
   if (mats.length) {
-    doc.setFontSize(12); doc.setTextColor(37, 99, 235); doc.text('Materiales', 20, y); y += 8;
-    doc.setFontSize(9); doc.setTextColor(100);
-    mats.forEach(m => { doc.text(`${m.name}: ${m.qty} x ${fmtCLPClient(m.unitPrice)} = ${fmtCLPClient(m.qty * m.unitPrice)}`, 25, y); y += 6; });
+    doc.setFillColor(124, 58, 237);
+    doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
+    doc.setFontSize(11);
+    doc.setTextColor(255);
+    doc.setFont(undefined, 'bold');
+    doc.text('Materiales', 25, y + 6);
+    y += 14;
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.setFont(undefined, 'bold');
+    doc.text('Material', 25, y);
+    doc.text('Cant.', 105, y, { align: 'center' });
+    doc.text('P. Unitario', 140, y, { align: 'right' });
+    doc.text('Total', pw - 25, y, { align: 'right' });
+    y += 3;
+    doc.setDrawColor(200);
+    doc.line(25, y, pw - 25, y);
+    y += 5;
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(60);
+    mats.forEach((m, i) => {
+      if (i % 2 === 0) { doc.setFillColor(249, 250, 251); doc.rect(22, y - 4, pw - 44, 7, 'F'); }
+      doc.text(m.name || '-', 25, y);
+      doc.text(String(m.qty), 105, y, { align: 'center' });
+      doc.text(fmtCLPClient(m.unitPrice), 140, y, { align: 'right' });
+      doc.text(fmtCLPClient(m.qty * m.unitPrice), pw - 25, y, { align: 'right' });
+      y += 7;
+    });
     y += 4;
   }
 
-  doc.line(20, y, pw - 20, y); y += 8;
-  doc.setFontSize(11); doc.setTextColor(80);
-  doc.text('Subtotal:', 25, y); doc.text(fmtCLPClient(q.subtotal), 155, y); y += 6;
-  doc.text(`Comisión VOY (${Math.round(q.commissionRate * 100)}%):`, 25, y); doc.text(fmtCLPClient(q.commission), 155, y); y += 8;
-  doc.setFontSize(14); doc.setTextColor(37, 99, 235);
-  doc.text('TOTAL:', 25, y); doc.text(fmtCLPClient(q.grandTotal), 155, y); y += 10;
+  // Resumen
+  doc.setDrawColor(124, 58, 237);
+  doc.setLineWidth(0.5);
+  doc.line(20, y, pw - 20, y);
+  y += 8;
+  doc.setFontSize(10);
+  doc.setTextColor(80);
+  doc.setFont(undefined, 'normal');
+  doc.text('Subtotal:', 25, y); doc.text(fmtCLPClient(q.subtotal), pw - 25, y, { align: 'right' }); y += 6;
+  doc.text(`Comisión VOY (${Math.round(q.commissionRate * 100)}%):`, 25, y); doc.text(fmtCLPClient(q.commission), pw - 25, y, { align: 'right' }); y += 10;
 
-  if (q.notes) { doc.setFontSize(10); doc.setTextColor(100); doc.text('Notas: ' + q.notes, 20, y); }
+  // Total grande
+  doc.setFillColor(124, 58, 237);
+  doc.roundedRect(20, y - 4, pw - 40, 14, 3, 3, 'F');
+  doc.setFontSize(16);
+  doc.setTextColor(255);
+  doc.setFont(undefined, 'bold');
+  doc.text('TOTAL', 25, y + 6);
+  doc.text(fmtCLPClient(q.grandTotal), pw - 25, y + 6, { align: 'right' });
+  y += 20;
 
-  y = doc.internal.pageSize.getHeight() - 15;
-  doc.setFontSize(8); doc.setTextColor(150);
-  doc.text('VOY SpA — Quinta Región, Chile', pw / 2, y, { align: 'center' });
-  doc.save(`Cotizacion_${q.quoteId}.pdf`);
+  if (q.notes) {
+    doc.setFontSize(10); doc.setTextColor(100); doc.setFont(undefined, 'bold');
+    doc.text('Notas:', 20, y); y += 6;
+    doc.setFont(undefined, 'normal'); doc.setFontSize(9);
+    const lines = doc.splitTextToSize(q.notes, pw - 45);
+    doc.text(lines, 25, y);
+  }
+
+  // Footer
+  doc.setFillColor(245, 243, 255);
+  doc.rect(0, ph - 20, pw, 20, 'F');
+  doc.setFontSize(8);
+  doc.setTextColor(124, 58, 237);
+  doc.setFont(undefined, 'bold');
+  doc.text('VOY SpA', pw / 2, ph - 12, { align: 'center' });
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(150);
+  doc.text('Quinta Región, Chile · www.voy.cl · Documento generado automáticamente', pw / 2, ph - 6, { align: 'center' });
+
+  doc.save(`Cotizacion_VOY_${q.quoteId}.pdf`);
 }
 
 function fmtCLPClient(n) {

@@ -1191,93 +1191,136 @@ function generateVoyPDF(data) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const pw = doc.internal.pageSize.getWidth();
-  let y = 20;
+  const ph = doc.internal.pageSize.getHeight();
+  const fmtP = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(n || 0);
 
-  // Header
+  // Marca de agua VOY
+  doc.setFontSize(120);
+  doc.setTextColor(230, 230, 240);
+  doc.text('VOY', pw / 2, ph / 2, { align: 'center', angle: 45 });
+
+  // Franja superior morada
+  doc.setFillColor(124, 58, 237);
+  doc.rect(0, 0, pw, 35, 'F');
+
+  // Logo VOY
   doc.setFontSize(28);
-  doc.setTextColor(37, 99, 235);
-  doc.text('VOY', 20, y);
-  doc.setFontSize(14);
-  doc.setTextColor(100);
-  doc.text('Cotización de Servicio', pw - 20, y, { align: 'right' });
-  y += 10;
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.text('VOY', 20, 24);
+
+  // Título
+  doc.setFontSize(13);
+  doc.setFont(undefined, 'normal');
+  doc.text('Cotización de Servicio', pw - 20, 18, { align: 'right' });
   doc.setFontSize(10);
-  doc.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, pw - 20, y, { align: 'right' });
-  y += 5;
-  doc.text(`Ref: ${data.quoteId}`, pw - 20, y, { align: 'right' });
-  y += 12;
+  doc.text(`${data.quoteId} · ${new Date().toLocaleDateString('es-CL')}`, pw - 20, 28, { align: 'right' });
 
-  // Línea divisoria
-  doc.setDrawColor(200);
-  doc.line(20, y, pw - 20, y);
-  y += 10;
+  let y = 50;
 
-  // Datos
-  doc.setFontSize(11);
-  doc.setTextColor(50);
-  doc.text(`Especialista: ${data.workerName}`, 20, y);
-  doc.text(`Cliente: ${data.clientName}`, pw / 2, y);
-  y += 6;
-  doc.text(`Servicio: ${data.service}`, 20, y);
-  doc.text(`Email: ${data.clientEmail}`, pw / 2, y);
-  y += 12;
-
-  // Mano de obra
-  doc.setFontSize(12);
-  doc.setTextColor(37, 99, 235);
-  doc.text('Mano de Obra', 20, y);
-  y += 8;
+  // Info box
+  doc.setFillColor(245, 243, 255);
+  doc.roundedRect(20, y - 5, pw - 40, 28, 3, 3, 'F');
   doc.setFontSize(10);
   doc.setTextColor(80);
-  doc.text(`Tarifa/hora: ${fmtCLP(data.laborRate)}  x  ${data.laborHours} horas  =  ${fmtCLP(data.laborTotal)}`, 25, y);
+  doc.setFont(undefined, 'bold');
+  doc.text('Especialista:', 25, y + 4);
+  doc.text('Cliente:', pw / 2, y + 4);
+  doc.setFont(undefined, 'normal');
+  doc.text(data.workerName || '', 25, y + 12);
+  doc.text(data.clientName || '', pw / 2, y + 12);
+  doc.setFont(undefined, 'bold');
+  doc.text('Servicio:', 25, y + 20);
+  doc.setFont(undefined, 'normal');
+  doc.text(data.service || '', 65, y + 20);
+  y += 35;
+
+  // Mano de obra
+  doc.setFillColor(124, 58, 237);
+  doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
+  doc.setFontSize(11);
+  doc.setTextColor(255);
+  doc.setFont(undefined, 'bold');
+  doc.text('Mano de Obra', 25, y + 6);
+  y += 14;
+
+  doc.setTextColor(60);
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.text(`Tarifa/hora: ${fmtP(data.laborRate)}`, 25, y);
+  doc.text(`Horas: ${data.laborHours}`, 100, y);
+  doc.setFont(undefined, 'bold');
+  doc.text(fmtP(data.laborTotal), pw - 25, y, { align: 'right' });
   y += 10;
 
   // Materiales
   const materials = data.materials || [];
   if (materials.length) {
-    doc.setFontSize(12);
-    doc.setTextColor(37, 99, 235);
-    doc.text('Materiales', 20, y);
-    y += 8;
+    doc.setFillColor(124, 58, 237);
+    doc.roundedRect(20, y, pw - 40, 8, 2, 2, 'F');
+    doc.setFontSize(11);
+    doc.setTextColor(255);
+    doc.setFont(undefined, 'bold');
+    doc.text('Materiales', 25, y + 6);
+    y += 14;
+
+    // Header tabla
     doc.setFontSize(9);
-    doc.setTextColor(100);
+    doc.setTextColor(120);
+    doc.setFont(undefined, 'bold');
     doc.text('Material', 25, y);
-    doc.text('Cant.', 100, y);
-    doc.text('P. Unit.', 120, y);
-    doc.text('Total', 155, y);
+    doc.text('Cant.', 105, y, { align: 'center' });
+    doc.text('P. Unitario', 140, y, { align: 'right' });
+    doc.text('Total', pw - 25, y, { align: 'right' });
+    y += 3;
+    doc.setDrawColor(200);
+    doc.line(25, y, pw - 25, y);
     y += 5;
-    doc.setDrawColor(220);
-    doc.line(25, y, 175, y);
-    y += 5;
+
+    doc.setFont(undefined, 'normal');
     doc.setTextColor(60);
-    materials.forEach(m => {
+    materials.forEach((m, i) => {
+      if (i % 2 === 0) { doc.setFillColor(249, 250, 251); doc.rect(22, y - 4, pw - 44, 7, 'F'); }
       doc.text(m.name || '-', 25, y);
-      doc.text(String(m.qty), 105, y);
-      doc.text(fmtCLP(m.unitPrice), 120, y);
-      doc.text(fmtCLP(m.qty * m.unitPrice), 155, y);
-      y += 6;
+      doc.text(String(m.qty), 105, y, { align: 'center' });
+      doc.text(fmtP(m.unitPrice), 140, y, { align: 'right' });
+      doc.text(fmtP(m.qty * m.unitPrice), pw - 25, y, { align: 'right' });
+      y += 7;
     });
     y += 4;
   }
 
   // Resumen
-  doc.setDrawColor(200);
+  doc.setDrawColor(124, 58, 237);
+  doc.setLineWidth(0.5);
   doc.line(20, y, pw - 20, y);
   y += 8;
-  doc.setFontSize(11);
+
+  doc.setFontSize(10);
   doc.setTextColor(80);
-  doc.text(`Subtotal mano de obra:`, 25, y); doc.text(fmtCLP(data.laborTotal), 155, y); y += 6;
-  doc.text(`Subtotal materiales:`, 25, y); doc.text(fmtCLP(data.materialsTotal), 155, y); y += 6;
-  doc.text(`Comisión VOY (${Math.round(data.commissionRate * 100)}%):`, 25, y); doc.text(fmtCLP(data.commission), 155, y); y += 8;
-  doc.setFontSize(14);
-  doc.setTextColor(37, 99, 235);
-  doc.text('TOTAL:', 25, y); doc.text(fmtCLP(data.grandTotal), 155, y); y += 10;
+  doc.setFont(undefined, 'normal');
+  doc.text('Subtotal mano de obra:', 25, y); doc.text(fmtP(data.laborTotal), pw - 25, y, { align: 'right' }); y += 6;
+  doc.text('Subtotal materiales:', 25, y); doc.text(fmtP(data.materialsTotal), pw - 25, y, { align: 'right' }); y += 6;
+  doc.text(`Comisión VOY (${Math.round((data.commissionRate || 0.15) * 100)}%):`, 25, y); doc.text(fmtP(data.commission), pw - 25, y, { align: 'right' }); y += 10;
+
+  // Total grande
+  doc.setFillColor(124, 58, 237);
+  doc.roundedRect(20, y - 4, pw - 40, 14, 3, 3, 'F');
+  doc.setFontSize(16);
+  doc.setTextColor(255);
+  doc.setFont(undefined, 'bold');
+  doc.text('TOTAL', 25, y + 6);
+  doc.text(fmtP(data.grandTotal), pw - 25, y + 6, { align: 'right' });
+  y += 20;
 
   // Notas
   if (data.notes) {
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text('Notas:', 20, y); y += 6;
+    doc.setFont(undefined, 'bold');
+    doc.text('Notas:', 20, y);
+    y += 6;
+    doc.setFont(undefined, 'normal');
     doc.setFontSize(9);
     const lines = doc.splitTextToSize(data.notes, pw - 45);
     doc.text(lines, 25, y);
@@ -1285,12 +1328,17 @@ function generateVoyPDF(data) {
   }
 
   // Footer
-  y = doc.internal.pageSize.getHeight() - 15;
+  doc.setFillColor(245, 243, 255);
+  doc.rect(0, ph - 20, pw, 20, 'F');
   doc.setFontSize(8);
+  doc.setTextColor(124, 58, 237);
+  doc.setFont(undefined, 'bold');
+  doc.text('VOY SpA', pw / 2, ph - 12, { align: 'center' });
+  doc.setFont(undefined, 'normal');
   doc.setTextColor(150);
-  doc.text('VOY SpA — Quinta Región, Chile', pw / 2, y, { align: 'center' });
+  doc.text('Quinta Región, Chile · www.voy.cl · Documento generado automáticamente', pw / 2, ph - 6, { align: 'center' });
 
-  doc.save(`Cotizacion_${data.quoteId}.pdf`);
+  doc.save(`Cotizacion_VOY_${data.quoteId}.pdf`);
 }
 
 function fmtCLP(n) {
