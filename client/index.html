@@ -61,6 +61,21 @@
       .worker-detail { width: 100%; right: 0; }
       .booking-sections { grid-template-columns: 1fr; }
     }
+    /* ── Autocomplete suggestions ── */
+    .search-suggestions {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+      background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg); max-height: 320px; overflow-y: auto; margin-top: 4px;
+    }
+    .suggest-section { padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--gray-400);
+      text-transform: uppercase; letter-spacing: 0.05em; }
+    .suggest-item { padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+      font-size: 14px; color: var(--gray-700); transition: background 0.15s; }
+    .suggest-item:hover, .suggest-item.active { background: var(--blue-50); color: var(--blue-700); }
+    .suggest-item i { width: 20px; text-align: center; color: var(--gray-400); }
+    .suggest-item:hover i { color: var(--blue-500); }
+    .suggest-highlight { font-weight: 700; color: var(--blue-600); }
+    .suggest-item-sub { font-size: 12px; color: var(--gray-400); margin-left: auto; }
   </style>
 </head>
 <body>
@@ -75,9 +90,10 @@
     <span class="topbar-role">Cliente</span>
   </div>
   <div class="topbar-center">
-    <div class="topbar-search">
+    <div class="topbar-search" style="position:relative;">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" placeholder="Buscar servicio, profesional..." id="mainSearch" oninput="filterWorkers()" />
+      <input type="text" placeholder="Buscar servicio, profesional..." id="mainSearch" oninput="onSearchInput()" autocomplete="off" />
+      <div id="searchSuggestions" class="search-suggestions" style="display:none;"></div>
     </div>
   </div>
   <div class="topbar-actions">

@@ -1087,3 +1087,135 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
     if (e.target === overlay) VOY.closeModal(overlay.id);
   });
 });
+
+/* ── Autocomplete / Sugerencias de búsqueda ─── */
+let suggestIndex = -1;
+
+function onSearchInput() {
+  const input = document.getElementById('mainSearch');
+  const box = document.getElementById('searchSuggestions');
+  if (!input || !box) return;
+
+  const q = input.value.trim().toLowerCase();
+  if (q.length === 0) { box.style.display = 'none'; filterWorkers(); return; }
+
+  const results = [];
+
+  // Buscar en categorías
+  const catMatches = VOY_DATA.categories.filter(c =>
+    c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+  );
+  if (catMatches.length > 0) {
+    results.push({ type: 'section', label: 'Servicios' });
+    catMatches.forEach(c => results.push({
+      type: 'category', id: c.id, label: c.label, icon: c.icon, color: c.color,
+    }));
+  }
+
+  // Buscar en profesionales
+  const workerMatches = VOY_DATA.workers.filter(w =>
+    w.name.toLowerCase().includes(q) ||
+    (w.categoryLabel || '').toLowerCase().includes(q) ||
+    (w.city || '').toLowerCase().includes(q)
+  ).slice(0, 6);
+  if (workerMatches.length > 0) {
+    results.push({ type: 'section', label: 'Profesionales' });
+    workerMatches.forEach(w => results.push({
+      type: 'worker', id: w.id, name: w.name, category: w.categoryLabel, avatar: w.avatar,
+      rating: w.rating, recordId: w._recordId,
+    }));
+  }
+
+  if (results.length === 0) {
+    box.style.display = 'none';
+    filterWorkers();
+    return;
+  }
+
+  suggestIndex = -1;
+  box.innerHTML = results.map((r, i) => {
+    if (r.type === 'section') {
+      return `<div class="suggest-section">${r.label}</div>`;
+    }
+    if (r.type === 'category') {
+      return `<div class="suggest-item" data-type="category" data-id="${r.id}" onclick="selectSuggestion(this)">
+        <i class="fa-solid ${r.icon}" style="color:${r.color};"></i>
+        <span>${highlightMatch(r.label, q)}</span>
+        <span class="suggest-item-sub">Categoría</span>
+      </div>`;
+    }
+    if (r.type === 'worker') {
+      return `<div class="suggest-item" data-type="worker" data-id="${r.recordId}" onclick="selectSuggestion(this)">
+        <img src="${r.avatar || 'https://i.pravatar.cc/32?img=15'}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" />
+        <div>
+          <div>${highlightMatch(r.name, q)}</div>
+          <div style="font-size:11px;color:var(--gray-400);">${r.category || ''} · ⭐ ${r.rating || '—'}</div>
+        </div>
+      </div>`;
+    }
+    return '';
+  }).join('');
+  box.style.display = 'block';
+
+  // También filtrar en tiempo real
+  filterWorkers();
+}
+
+function highlightMatch(text, query) {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return text.slice(0, idx) + '<span class="suggest-highlight">' + text.slice(idx, idx + query.length) + '</span>' + text.slice(idx + query.length);
+}
+
+function selectSuggestion(el) {
+  const type = el.dataset.type;
+  const id = el.dataset.id;
+  const box = document.getElementById('searchSuggestions');
+  const input = document.getElementById('mainSearch');
+  if (box) box.style.display = 'none';
+
+  if (type === 'category') {
+    // Filtrar por categoría
+    if (input) input.value = '';
+    const catFilter = document.getElementById('filterCategory');
+    if (catFilter) { catFilter.value = id; filterWorkers(); }
+  } else if (type === 'worker') {
+    // Abrir perfil del profesional
+    if (input) input.value = '';
+    const worker = VOY_DATA.workers.find(w => w._recordId === id);
+    if (worker && typeof openWorkerDetail === 'function') openWorkerDetail(worker);
+  }
+}
+
+// Cerrar sugerencias al hacer click fuera
+document.addEventListener('click', (e) => {
+  const box = document.getElementById('searchSuggestions');
+  const input = document.getElementById('mainSearch');
+  if (box && !box.contains(e.target) && e.target !== input) {
+    box.style.display = 'none';
+  }
+});
+
+// Navegación con teclado en sugerencias
+document.getElementById('mainSearch')?.addEventListener('keydown', (e) => {
+  const box = document.getElementById('searchSuggestions');
+  if (!box || box.style.display === 'none') return;
+  const items = box.querySelectorAll('.suggest-item');
+  if (items.length === 0) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    suggestIndex = Math.min(suggestIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === suggestIndex));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    suggestIndex = Math.max(suggestIndex - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('active', i === suggestIndex));
+  } else if (e.key === 'Enter' && suggestIndex >= 0) {
+    e.preventDefault();
+    items[suggestIndex]?.click();
+  } else if (e.key === 'Escape') {
+    box.style.display = 'none';
+  }
+});
