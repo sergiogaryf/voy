@@ -1187,7 +1187,7 @@ function generateVoyPDF(data) {
   if (typeof window.jspdf === 'undefined') {
     // Cargar dinámicamente y reintentar
     const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     s.onload = () => generateVoyPDF(data);
     s.onerror = () => console.warn('No se pudo cargar jsPDF');
     document.head.appendChild(s);
